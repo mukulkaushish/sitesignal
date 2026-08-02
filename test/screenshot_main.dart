@@ -9,11 +9,10 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:site_signal/app/site_signal_app.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
-import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'support/fakes.dart';
+import 'support/demo_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,18 +49,9 @@ Future<void> main() async {
       ),
     );
   }
-  final controller = MonitorController(
-    repository: MemoryMonitorRepository(
-      sites: _sampleSites(),
-      themePreference: themePreference,
-    ),
-    healthChecker: ScriptedHealthChecker(),
-    faviconResolver: FakeFaviconResolver(),
-    desktopBridge: FakeDesktopBridge(),
-    backgroundMonitor: FakeBackgroundMonitor(),
-    schedulerInterval: const Duration(days: 1),
+  final controller = await createDemoMonitorController(
+    themePreference: themePreference,
   );
-  await controller.initialize();
   runApp(_ScreenshotCapture(controller: controller, themeName: themeName));
 }
 
@@ -101,7 +91,11 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
         throw StateError('Screenshot boundary is not ready.');
       }
 
-      final image = await renderObject.toImage();
+      // macOS is supersampled for a sharp repository asset. Android uses this
+      // file only as a readiness marker; adb captures the physical display so
+      // the final image includes native status and navigation bars.
+      final pixelRatio = Platform.isAndroid ? 1.0 : 2.0;
+      final image = await renderObject.toImage(pixelRatio: pixelRatio);
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       if (data == null) {
@@ -113,6 +107,9 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
       await outputFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
       stdout.writeln('SCREENSHOT_SAVED=${outputFile.path}');
       await stdout.flush();
+      if (Platform.isAndroid) {
+        return;
+      }
       exit(0);
     } on Object catch (error, stackTrace) {
       stderr
@@ -148,68 +145,4 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
       ),
     );
   }
-}
-
-List<SiteMonitor> _sampleSites() {
-  final now = DateTime.now().toUtc();
-  return <SiteMonitor>[
-    SiteMonitor(
-      id: 'sample-api',
-      name: 'Production API',
-      baseUrl: 'https://api.example.com',
-      probeUrl: 'https://api.example.com/readyz',
-      faviconUrl: null,
-      intervalSeconds: 60,
-      enabled: true,
-      status: HealthStatus.up,
-      createdAt: now.subtract(const Duration(days: 30)),
-      history: <CheckRecord>[
-        CheckRecord(
-          checkedAt: now.subtract(const Duration(minutes: 2)),
-          status: HealthStatus.up,
-          responseTimeMs: 42,
-          statusCode: 200,
-          error: null,
-          checkedUrl: 'https://api.example.com/readyz',
-        ),
-        CheckRecord(
-          checkedAt: now.subtract(const Duration(days: 2)),
-          status: HealthStatus.up,
-          responseTimeMs: 58,
-          statusCode: 200,
-          error: null,
-          checkedUrl: 'https://api.example.com/readyz',
-        ),
-      ],
-    ),
-    SiteMonitor(
-      id: 'sample-store',
-      name: 'Storefront',
-      baseUrl: 'https://shop.example.com',
-      probeUrl: 'https://shop.example.com/health',
-      faviconUrl: null,
-      intervalSeconds: 300,
-      enabled: true,
-      status: HealthStatus.down,
-      createdAt: now.subtract(const Duration(days: 14)),
-      history: <CheckRecord>[
-        CheckRecord(
-          checkedAt: now.subtract(const Duration(minutes: 12)),
-          status: HealthStatus.down,
-          responseTimeMs: 316,
-          statusCode: 503,
-          error: 'Server returned HTTP 503.',
-          checkedUrl: 'https://shop.example.com/health',
-        ),
-        CheckRecord(
-          checkedAt: now.subtract(const Duration(days: 1)),
-          status: HealthStatus.up,
-          responseTimeMs: 81,
-          statusCode: 200,
-          error: null,
-          checkedUrl: 'https://shop.example.com/health',
-        ),
-      ],
-    ),
-  ];
 }

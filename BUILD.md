@@ -21,7 +21,7 @@ flutter pub get
 Before packaging a release, run the project checks:
 
 ```bash
-dart format --output=none --set-exit-if-changed lib test tool
+dart format --output=none --set-exit-if-changed lib test integration_test tool
 dart run tool/check_code_rules.dart
 flutter analyze
 flutter test
@@ -293,29 +293,12 @@ Desktop sleep/wake smoke test:
 3. Confirm the sleep-spanning request did not create a false outage or duplicate
    notification.
 
-## iOS build
+## iOS distribution status
 
-On macOS with Xcode, validate the unsigned release with:
-
-```bash
-flutter build ios --release --no-codesign
-```
-
-Output:
-
-```text
-build/ios/iphoneos/Runner.app
-```
-
-Select an Apple development team and use your distribution profile before
-installing on hardware or publishing through App Store Connect.
-
-On iOS, SiteSignal registers a `BGAppRefreshTask` through the foreground-task
-plugin. iOS chooses when it runs (commonly a short window around every 15
-minutes or later), so short monitor intervals are not guaranteed in the
-background. Force-quitting stops refresh and the task cannot restart at boot.
-Foreground and overdue-on-resume checks remain available. Test background
-behavior on hardware because simulator scheduling is not representative.
+iOS distribution is intentionally disabled for now. The application source and
+runner remain available for future platform work, but
+`tool/build_all_platforms.dart`, CI, manual release runs, and tagged releases do
+not create or publish an iOS artifact.
 
 ## Zero-cost CI/CD
 
@@ -331,7 +314,8 @@ pushes to `main`:
 2. One Apple-silicon macOS package and Android split APKs for ARMv7, ARM64, and
    x86_64.
 3. Native-engine light and dark screenshots on macOS and an Android Pixel 4a
-   emulator using sanitized sample monitors.
+   emulator using sanitized sample monitors, plus a full Android feature-tour
+   video artifact.
 4. A screenshot comparison on pull requests. A successful `main` build commits
    changed screenshots as `github-actions[bot]`; screenshot-only commits do not
    start another run.
@@ -341,7 +325,7 @@ the same branch are canceled. Flutter and emulator caches are deliberately not
 stored, avoiding persistent cache growth in exchange for slightly longer free
 runner time.
 
-### Reproduce screenshots locally
+### Reproduce visual assets locally
 
 On macOS:
 
@@ -365,10 +349,28 @@ docs/screenshots/android-light.png
 docs/screenshots/android-dark.png
 ```
 
-The Flutter entry point is `test/screenshot_main.dart`. It writes a PNG from a
-root `RepaintBoundary` in the actual platform engine, so capture does not need
-macOS Screen Recording permission and does not use Flutter's placeholder test
-font.
+The Flutter entry point is `test/screenshot_main.dart`. macOS writes a 2× PNG
+from a root `RepaintBoundary` in the actual platform engine, so capture does not
+need Screen Recording permission and does not use Flutter's placeholder test
+font. Android uses `adb screencap` at the emulator's native 1080×2340 display
+resolution, which includes the real status and navigation bars. The capture
+script enables Android SystemUI demo mode so the clock, battery, and network
+icons remain deterministic across CI runs.
+
+Record the complete Android feature walkthrough on the same emulator with:
+
+```bash
+ANDROID_DEVICE_ID=emulator-5554 \
+  ./tool/capture_feature_walkthrough.sh android
+```
+
+The script runs `integration_test/walkthrough_test.dart`, records the physical
+display as H.264, verifies that the tour completed, and replaces
+`docs/walkthrough/sitesignal-android.mp4`. The fixture uses only sanitized
+`example.com` data. The bitrate and a 10 MB size gate keep the video compatible
+with GitHub's free-account attachment limit. CI regenerates the recording as a
+short-lived artifact; the deterministic PNGs remain the files automatically
+committed on `main`.
 
 ### Full native release matrix
 
@@ -381,7 +383,6 @@ a GitHub release:
 - Windows x86_64 on `windows-latest`
 - Windows ARM64 on `windows-11-arm`
 - Android ARMv7, ARM64, and x86_64 APKs on `ubuntu-latest`
-- unsigned iOS ARM64 on `macos-15`
 
 The workflow exposes architecture-named artifacts for one day. This expensive
 matrix is intentionally manual or release-only instead of running for every
@@ -398,9 +399,9 @@ git push origin v1.0.0
 ```
 
 The same quality gate and complete matrix must pass. The workflow combines the
-packages, creates `SHA256SUMS.txt`, and publishes them to a GitHub prerelease
-using the repository's built-in token. GitHub release downloads do not depend
-on the short-lived workflow artifacts.
+packages and walkthrough, creates `SHA256SUMS.txt`, and publishes them to a
+GitHub prerelease using the repository's built-in token. GitHub release
+downloads do not depend on the short-lived workflow artifacts.
 
 The free outputs are intentionally labeled as prereleases:
 
@@ -409,7 +410,7 @@ The free outputs are intentionally labeled as prereleases:
 - Android APKs currently use the repository's development signing setup. A
   production keystore can be generated without paying a store, but its private
   key must be protected outside the repository.
-- Windows MSIX is development signed, and iOS is unsigned.
+- Windows MSIX is development signed.
 
 Users can download Android APKs and the macOS archive directly from GitHub at no
 hosting cost, but operating systems may show warnings for these development

@@ -35,7 +35,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Verify Dart formatting
-        run: dart format --output=none --set-exit-if-changed lib test tool
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test integration_test tool
       - name: Verify shell syntax
         run: bash -n tool/*.sh
       - name: Enforce repository code rules
@@ -89,7 +91,7 @@ jobs:
           retention-days: 7
 
   android:
-    name: Android build and screenshots
+    name: Android build, screenshots, and walkthrough
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -116,7 +118,7 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Capture light and dark screenshots
+      - name: Capture screenshots and feature walkthrough
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -127,9 +129,9 @@ jobs:
           emulator-options: >-
             -no-window -gpu swiftshader_indirect -no-snapshot -noaudio
             -no-boot-anim -camera-back none
-          script: >-
-            ANDROID_DEVICE_ID=emulator-5554
-            ./tool/capture_repository_screenshots.sh android
+          script: |
+            ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_repository_screenshots.sh android
+            ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_feature_walkthrough.sh android
       - name: Upload Android distributions
         uses: actions/upload-artifact@v7
         with:
@@ -145,6 +147,14 @@ jobs:
           path: docs/screenshots/android-*.png
           if-no-files-found: error
           retention-days: 7
+      - name: Upload Android feature walkthrough
+        uses: actions/upload-artifact@v7
+        with:
+          name: sitesignal-walkthrough-android
+          path: docs/walkthrough/sitesignal-android.mp4
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
 
   verify-screenshots:
     name: Verify committed screenshots

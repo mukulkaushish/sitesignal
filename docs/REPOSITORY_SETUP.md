@@ -22,7 +22,6 @@ health-check
 local-first
 desktop-app
 android
-ios
 macos
 linux
 windows
@@ -110,9 +109,9 @@ not exist in the repository.
 
 Protect the default branch by requiring pull requests, the **Format, analyze,
 and test**, **ARM macOS build and screenshots**, **Android build and
-screenshots**, and **Verify committed screenshots** checks, resolved review
-conversations, and a current branch before merging. Decide whether administrator
-bypass is appropriate for the maintainer model.
+screenshots and walkthrough**, and **Verify committed screenshots** checks,
+resolved review conversations, and a current branch before merging. Decide
+whether administrator bypass is appropriate for the maintainer model.
 
 Allow GitHub Actions to create commits on `main` so the screenshot refresh job
 can write the four generated images. All other CI jobs use read-only repository
@@ -140,10 +139,12 @@ available. A dedicated project email is preferable to a personal address.
 4. Run **Actions → Release → Run workflow** and review the complete native build
    matrix without publishing a release.
 5. Perform the real-device and desktop smoke tests in `BUILD.md`.
-6. Sign Android, Apple, and Windows packages with protected production
-   credentials. Public macOS distribution also needs notarization.
+6. Sign Android, macOS, and Windows packages with protected production
+   credentials. Public macOS distribution also needs notarization. iOS
+   distribution is currently disabled.
 7. Attach only intended release packages, checksums, release notes, and any
-   required source archive.
+   required source archive. The workflow also attaches the sanitized Android
+   walkthrough.
 8. Clearly label unsigned, development-signed, or architecture-specific
    artifacts.
 9. Create and push a signed `v*` version tag only after the release contents are

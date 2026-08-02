@@ -80,7 +80,7 @@ The complete invariant list and reasoning are in [CLAUDE.md](CLAUDE.md).
 Run all checks from the repository root:
 
 ```bash
-dart format --output=none --set-exit-if-changed lib test tool
+dart format --output=none --set-exit-if-changed lib test integration_test tool
 dart run tool/check_code_rules.dart
 flutter analyze
 flutter test
@@ -96,11 +96,13 @@ a pull request:
 ```bash
 ./tool/capture_repository_screenshots.sh macos
 ANDROID_DEVICE_ID=<emulator-id> ./tool/capture_repository_screenshots.sh android
+ANDROID_DEVICE_ID=<emulator-id> ./tool/capture_feature_walkthrough.sh android
 ```
 
-The screenshot harness contains only sanitized `example.com` fixtures. Do not
+The visual harness contains only sanitized `example.com` fixtures. Do not
 replace them with personal monitor data. CI compares all four generated images
-with `docs/screenshots/` and reports stale screenshots as a failed check.
+with `docs/screenshots/`, reports stale screenshots as a failed check, and
+uploads the freshly recorded walkthrough as a short-lived artifact.
 
 ## Pull requests
 

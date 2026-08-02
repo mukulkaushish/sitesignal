@@ -11,6 +11,28 @@ android_device_id="${ANDROID_DEVICE_ID:-emulator-5554}"
 mkdir -p "$screenshot_directory"
 cd "$project_directory"
 
+enable_android_demo_mode() {
+  adb -s "$android_device_id" shell settings put global sysui_demo_allowed 1
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command enter >/dev/null
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command clock -e hhmm 1200 >/dev/null
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command battery \
+    -e level 100 -e plugged false >/dev/null
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command network \
+    -e wifi show -e level 4 -e mobile show -e datatype lte >/dev/null
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command notifications \
+    -e visible false >/dev/null
+}
+
+disable_android_demo_mode() {
+  adb -s "$android_device_id" shell am broadcast \
+    -a com.android.systemui.demo -e command exit >/dev/null 2>&1 || true
+}
+
 capture_macos() {
   local theme="$1"
   local output="$screenshot_directory/macos-$theme.png"
@@ -35,14 +57,49 @@ capture_android() {
   local theme="$1"
   local filename="sitesignal-android-$theme.png"
   local output="$screenshot_directory/android-$theme.png"
+  local capture_log
+  local flutter_pid
+  local ready=false
 
+  capture_log="$(mktemp)"
+  enable_android_demo_mode
+  adb -s "$android_device_id" shell \
+    run-as dev.sitesignal.app rm -f "cache/$filename" >/dev/null 2>&1 || true
   flutter run \
     --device-id "$android_device_id" \
     --target test/screenshot_main.dart \
-    --dart-define "SCREENSHOT_THEME=$theme"
+    --dart-define "SCREENSHOT_THEME=$theme" >"$capture_log" 2>&1 &
+  flutter_pid=$!
 
-  adb -s "$android_device_id" exec-out \
-    run-as dev.sitesignal.app cat "cache/$filename" > "$output"
+  for _ in $(seq 1 180); do
+    if adb -s "$android_device_id" shell \
+      run-as dev.sitesignal.app test -s "cache/$filename" >/dev/null 2>&1; then
+      ready=true
+      break
+    fi
+    if ! kill -0 "$flutter_pid" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "$ready" != true ]]; then
+    cat "$capture_log" >&2
+    kill -INT "$flutter_pid" >/dev/null 2>&1 || true
+    wait "$flutter_pid" >/dev/null 2>&1 || true
+    adb -s "$android_device_id" shell am force-stop dev.sitesignal.app || true
+    disable_android_demo_mode
+    rm -f "$capture_log"
+    echo "Android screenshot fixture did not become ready." >&2
+    return 1
+  fi
+
+  adb -s "$android_device_id" exec-out screencap -p >"$output"
+  kill -INT "$flutter_pid" >/dev/null 2>&1 || true
+  wait "$flutter_pid" >/dev/null 2>&1 || true
+  adb -s "$android_device_id" shell am force-stop dev.sitesignal.app || true
+  disable_android_demo_mode
+  rm -f "$capture_log"
   test -s "$output"
 }
 
