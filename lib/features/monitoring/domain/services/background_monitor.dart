@@ -63,15 +63,14 @@ BackgroundMonitorSnapshot mergeBackgroundSnapshotResults(
   BackgroundMonitorSnapshot configuration,
   BackgroundMonitorSnapshot runtime,
 ) {
+  final runtimeSitesByIdentity = <(String, String), SiteMonitor>{};
+  for (final site in runtime.sites) {
+    runtimeSitesByIdentity.putIfAbsent((site.id, site.baseUrl), () => site);
+  }
   final sites = <SiteMonitor>[];
   for (final configuredSite in configuration.sites) {
-    final runtimeSite = runtime.sites
-        .where(
-          (site) =>
-              site.id == configuredSite.id &&
-              site.baseUrl == configuredSite.baseUrl,
-        )
-        .firstOrNull;
+    final runtimeSite =
+        runtimeSitesByIdentity[(configuredSite.id, configuredSite.baseUrl)];
     if (runtimeSite == null) {
       sites.add(configuredSite);
       continue;

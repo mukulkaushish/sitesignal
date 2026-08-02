@@ -62,4 +62,39 @@ void main() {
     expect(site.probeUrl, 'https://example.com/health');
     expect(site.uptimePercentAt(DateTime.utc(2026, 1, 1, 0, 3)), 50);
   });
+
+  test('keeps uptime within a valid percentage when clocks move', () {
+    final asOf = DateTime.utc(2026, 1, 1, 0, 3);
+    final site = SiteMonitor(
+      id: 'site-1',
+      name: 'Example',
+      baseUrl: 'https://example.com',
+      probeUrl: null,
+      faviconUrl: null,
+      intervalSeconds: 60,
+      enabled: true,
+      status: HealthStatus.up,
+      createdAt: DateTime.utc(2026, 1, 1),
+      history: <CheckRecord>[
+        CheckRecord(
+          checkedAt: asOf.add(const Duration(minutes: 1)),
+          status: HealthStatus.up,
+          responseTimeMs: 42,
+          statusCode: 200,
+          error: null,
+          checkedUrl: 'https://example.com',
+        ),
+        CheckRecord(
+          checkedAt: DateTime.utc(2026, 1, 1, 0, 1),
+          status: HealthStatus.up,
+          responseTimeMs: 42,
+          statusCode: 200,
+          error: null,
+          checkedUrl: 'https://example.com',
+        ),
+      ],
+    );
+
+    expect(site.uptimePercentAt(asOf), 100);
+  });
 }

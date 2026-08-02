@@ -60,11 +60,14 @@ extension CheckRecordHistory on Iterable<CheckRecord> {
             : first.status.index.compareTo(second.status.index);
       });
     final transitions = <CheckRecord>[];
-    final seen = <String>{};
+    final seen = <(int, HealthStatus, int?, String)>{};
     for (final record in records) {
-      final key =
-          '${record.checkedAt.toUtc().microsecondsSinceEpoch}|'
-          '${record.status.name}|${record.statusCode}|${record.checkedUrl}';
+      final key = (
+        record.checkedAt.toUtc().microsecondsSinceEpoch,
+        record.status,
+        record.statusCode,
+        record.checkedUrl,
+      );
       if (!seen.add(key)) {
         continue;
       }
@@ -146,7 +149,9 @@ class SiteMonitor {
       }
     }
     final totalMilliseconds = end.difference(start).inMilliseconds;
-    return (healthyMilliseconds / totalMilliseconds) * 100;
+    return ((healthyMilliseconds / totalMilliseconds) * 100)
+        .clamp(0, 100)
+        .toDouble();
   }
 
   double? get uptimePercent => uptimePercentAt(DateTime.now().toUtc());
