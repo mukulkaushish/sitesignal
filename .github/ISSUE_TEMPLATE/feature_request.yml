@@ -1,0 +1,82 @@
+name: Feature request
+description: Propose a focused improvement to SiteSignal.
+title: "[Feature] "
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SiteSignal prioritizes monitoring correctness, background reliability,
+        privacy, and a small understandable feature set. Explain the user
+        problem first so possible solutions can be compared.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find the same request.
+          required: true
+        - label: This request does not include a private monitor URL or sensitive data.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who has this problem, and what can they not do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the outcome rather than only a particular implementation.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Platform scope
+      multiple: true
+      options:
+        - All platforms
+        - Android
+        - iOS
+        - macOS
+        - Linux
+        - Windows
+        - Documentation or tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Note current workarounds or simpler options you considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Monitoring, privacy, or background impact
+      description: Explain any effect on network requests, stored data, permissions, notifications, or background work.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to work on this?
+      options:
+        - Yes
+        - Maybe, with guidance
+        - No
+    validations:
+      required: true

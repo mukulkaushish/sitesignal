@@ -1,0 +1,102 @@
+name: Bug report
+description: Report reproducible behavior that is not working as expected.
+title: "[Bug] "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve SiteSignal. Remove real monitor URLs,
+        credentials, response bodies, notification contents, database files,
+        and signing information before submitting anything publicly. Report
+        vulnerabilities through the process in SECURITY.md instead.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed private URLs and sensitive information.
+          required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iOS
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: SiteSignal version
+      description: Find this in Settings → About.
+      placeholder: 1.0.0+1
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Device and operating-system version
+      placeholder: MacBook Air M3, macOS 15.6
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation source
+      options:
+        - Official release artifact
+        - GitHub Actions artifact
+        - Locally built release
+        - Flutter debug build
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior and when it occurs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include the smallest sequence that reliably reproduces the problem.
+      placeholder: |
+        1. Open …
+        2. Select …
+        3. Observe …
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Additional context
+      description: Add sanitized screenshots, logs, frequency, and relevant notification or background settings.
+    validations:
+      required: false
