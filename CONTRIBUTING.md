@@ -24,9 +24,9 @@ flutter pub get
 flutter run -d <device-id>
 ```
 
-Replace `<device-id>` with `macos`, `linux`, `windows`, an Android device, or an
-iOS device. Native desktop releases must be built on the matching host
-operating system. Apple releases require macOS and Xcode.
+Replace `<device-id>` with `macos`, `linux`, `windows`, or an Android device.
+Native desktop releases must be built on the matching host operating system.
+SiteSignal does not currently build or publish iOS artifacts.
 
 ## Project structure
 
@@ -41,10 +41,6 @@ SiteSignal uses a feature-first, ports-and-adapters design:
 - `lib/core` contains shared async, theme, platform, text, and widget code.
 - `test` mirrors the production behavior with unit, adapter, controller, and
   responsive widget coverage.
-
-Read [CLAUDE.md](CLAUDE.md) before modifying code. Despite its filename, it is
-the repository-wide engineering standard for every contributor and coding
-assistant.
 
 ## Core correctness rules
 
@@ -61,8 +57,7 @@ assistant.
 - Use shared theme tokens and native system typography.
 - Regenerate icons and sounds from their checked-in generators instead of
   editing platform copies individually.
-
-The complete invariant list and reasoning are in [CLAUDE.md](CLAUDE.md).
+- Keep the version in `pubspec.yaml` synchronized with the MSIX version.
 
 ## Making a change
 
@@ -96,13 +91,11 @@ a pull request:
 ```bash
 ./tool/capture_repository_screenshots.sh macos
 ANDROID_DEVICE_ID=<emulator-id> ./tool/capture_repository_screenshots.sh android
-ANDROID_DEVICE_ID=<emulator-id> ./tool/capture_feature_walkthrough.sh android
 ```
 
 The visual harness contains only sanitized `example.com` fixtures. Do not
-replace them with personal monitor data. CI compares all four generated images
-with `docs/screenshots/`, reports stale screenshots as a failed check, and
-uploads the freshly recorded walkthrough as a short-lived artifact.
+replace them with personal monitor data. CI uploads all six generated images
+as review artifacts; contributors commit intentional screenshot updates.
 
 ## Pull requests
 

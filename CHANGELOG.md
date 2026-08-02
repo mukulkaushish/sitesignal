@@ -8,23 +8,23 @@ Notable user-visible changes to SiteSignal are recorded here. The project uses
 ### Added
 
 - Initial public-release documentation and GitHub contribution templates.
-- Cross-platform local website monitoring for macOS, Linux, Windows, Android,
-  and iOS.
+- Cross-platform local website monitoring for macOS, Linux, Windows, and
+  Android.
 - Same-origin health-probe discovery, connectivity-aware outage detection, and
   transition-only history.
 - Native outage and recovery notifications with selectable sounds.
-- Desktop tray operation, Android foreground monitoring, and best-effort iOS
-  background refresh.
+- Desktop tray operation and Android foreground monitoring.
 - Local SQLite persistence, responsive navigation, appearance controls, and
   architecture-specific release packaging.
-- Native-engine light/dark screenshots for macOS and Android, refreshed on the
-  default branch and verified in pull requests.
-- A reproducible, full-feature Android walkthrough recorded at native device
-  resolution with status and navigation bars.
+- Native-engine light-mode screenshots of Overview, History, and Settings for
+  macOS and Android, with reproducible captures uploaded as CI review
+  artifacts.
+- A reproducible Android end-to-end feature flow in CI.
 - Cost-conscious GitHub Actions CI, full native release builds, checksums,
-  prerelease publishing, and monthly dependency updates.
+  and prerelease publishing.
 
 ### Changed
 
 - Disabled iOS artifact creation in local build automation, CI, and tagged
   releases while retaining the platform source for future work.
+- Removed bot-authored dependency pull requests and screenshot commits.

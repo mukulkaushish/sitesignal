@@ -313,12 +313,11 @@ pushes to `main`:
    static analysis, and the complete Flutter test suite with an LCOV report.
 2. One Apple-silicon macOS package and Android split APKs for ARMv7, ARM64, and
    x86_64.
-3. Native-engine light and dark screenshots on macOS and an Android Pixel 4a
-   emulator using sanitized sample monitors, plus a full Android feature-tour
-   video artifact.
-4. A screenshot comparison on pull requests. A successful `main` build commits
-   changed screenshots as `github-actions[bot]`; screenshot-only commits do not
-   start another run.
+3. Native-engine light-mode screenshots of Overview, History, and Settings on
+   macOS and an Android Pixel 4a emulator using sanitized sample monitors. The
+   Android emulator also runs the complete end-to-end feature flow.
+4. Screenshot artifacts for visual review. Contributors commit regenerated
+   images themselves; CI never creates a bot-authored commit.
 
 Normal build and coverage artifacts expire after seven days. Superseded runs on
 the same branch are canceled. Flutter and emulator caches are deliberately not
@@ -343,10 +342,12 @@ ANDROID_DEVICE_ID=emulator-5554 \
 The commands replace exactly these files:
 
 ```text
-docs/screenshots/macos-light.png
-docs/screenshots/macos-dark.png
-docs/screenshots/android-light.png
-docs/screenshots/android-dark.png
+docs/screenshots/macos-overview-light.png
+docs/screenshots/macos-history-light.png
+docs/screenshots/macos-settings-light.png
+docs/screenshots/android-overview-light.png
+docs/screenshots/android-history-light.png
+docs/screenshots/android-settings-light.png
 ```
 
 The Flutter entry point is `test/screenshot_main.dart`. macOS writes a 2× PNG
@@ -357,20 +358,8 @@ resolution, which includes the real status and navigation bars. The capture
 script enables Android SystemUI demo mode so the clock, battery, and network
 icons remain deterministic across CI runs.
 
-Record the complete Android feature walkthrough on the same emulator with:
-
-```bash
-ANDROID_DEVICE_ID=emulator-5554 \
-  ./tool/capture_feature_walkthrough.sh android
-```
-
-The script runs `integration_test/walkthrough_test.dart`, records the physical
-display as H.264, verifies that the tour completed, and replaces
-`docs/walkthrough/sitesignal-android.mp4`. The fixture uses only sanitized
-`example.com` data. The bitrate and a 10 MB size gate keep the video compatible
-with GitHub's free-account attachment limit. CI regenerates the recording as a
-short-lived artifact; the deterministic PNGs remain the files automatically
-committed on `main`.
+CI also runs `integration_test/feature_flow_test.dart` on the Android emulator
+to exercise the complete feature flow.
 
 ### Full native release matrix
 
@@ -399,7 +388,7 @@ git push origin v1.0.0
 ```
 
 The same quality gate and complete matrix must pass. The workflow combines the
-packages and walkthrough, creates `SHA256SUMS.txt`, and publishes them to a
+packages, creates `SHA256SUMS.txt`, and publishes them to a
 GitHub prerelease using the repository's built-in token. GitHub release
 downloads do not depend on the short-lived workflow artifacts.
 
