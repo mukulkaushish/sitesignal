@@ -122,7 +122,7 @@ Never trade away #1 or #2 to satisfy a lower-priority rule.
 ## 12. Automated Enforcement
 
 ```sh
-dart format --output=none --set-exit-if-changed lib test tool
+dart format --output=none --set-exit-if-changed lib test integration_test tool
 dart run tool/check_code_rules.dart   # null-safety guard + cross-platform metadata/asset parity
 flutter analyze
 flutter test

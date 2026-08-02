@@ -11,27 +11,43 @@
 > your monitoring data to a hosted service.
 
 SiteSignal is a local-first, cross-platform website health monitor for macOS,
-Linux, Windows, Android, and iOS. Add a base URL, choose a check interval, and
+Linux, Windows, and Android. Add a base URL, choose a check interval, and
 receive a native notification when its health changes. Desktop builds keep
-working from the menu bar or system tray, Android uses a visible foreground
-service, and iOS performs best-effort background refresh with catch-up checks
-when the app resumes.
+working from the menu bar or system tray, while Android uses a visible
+foreground service. The iOS source remains in the repository for future work,
+but iOS build creation and distribution are intentionally disabled.
 
 There is no SiteSignal account, hosted backend, analytics SDK, advertising, or
 subscription. Monitor configuration and history stay in a local SQLite
 database on the device running the app.
 
-[Screenshots](#screenshots) · [Quick start](#quick-start) · [Features](#what-it-includes) ·
+[Walkthrough](#feature-walkthrough) · [Quick start](#quick-start) · [Features](#what-it-includes) ·
 [Platform behavior](#platform-behavior) · [Architecture](#architecture) ·
 [Contributing](CONTRIBUTING.md) · [Privacy](PRIVACY.md) ·
 [Security](SECURITY.md)
 
-## Screenshots
+## Feature walkthrough
 
-Every image below is captured by the native macOS or Android Flutter engine
-from sanitized `example.com` fixtures. CI regenerates both themes after each
+**[▶ Watch the complete Android walkthrough (MP4, 1080×2340)](docs/walkthrough/sitesignal-android.mp4)**
+
+The 70-second native recording uses sanitized `example.com` fixtures and walks
+through the dashboard and health details, adding a monitor, interval selection,
+disable/enable/edit/remove actions, manual checks, History filters, light and
+dark appearance, accent colors, automatic monitoring, custom and system
+notification sounds, the test notification action, and Android background
+behavior. It includes the real Android status and navigation bars.
+
+The walkthrough is driven by `integration_test/walkthrough_test.dart`, so the
+same feature sequence can be rerun instead of relying on an unreproducible
+manual recording.
+
+<details>
+<summary>High-resolution CI visual references</summary>
+
+CI also regenerates native-engine light and dark references after every
 successful `main` build and rejects pull requests whose committed images are
-stale.
+stale. These remain regression assets; the walkthrough above is the primary
+product tour.
 
 | macOS light | macOS dark |
 | --- | --- |
@@ -40,6 +56,8 @@ stale.
 | Android light | Android dark |
 | --- | --- |
 | <img src="docs/screenshots/android-light.png" width="320" alt="SiteSignal dashboard on Android in light mode"> | <img src="docs/screenshots/android-dark.png" width="320" alt="SiteSignal dashboard on Android in dark mode"> |
+
+</details>
 
 ## At a glance
 
@@ -51,7 +69,7 @@ stale.
 | Alerts | Native outage and recovery notifications, emitted only on real state changes |
 | Storage | Local SQLite database with bounded per-site transition history |
 | Privacy | No account, cloud sync, analytics, advertising, or remote SiteSignal server |
-| Platforms | macOS, Linux, Windows, Android, and iOS |
+| Enabled distributions | macOS, Linux, Windows, and Android |
 
 SiteSignal complements rather than replaces geographically distributed hosted
 monitoring. Because checks originate from one local device, it is best when a
@@ -220,8 +238,8 @@ flutter pub get
 dart run tool/build_all_platforms.dart
 ```
 
-The command detects the host. macOS builds macOS, Android, and iOS; Linux builds
-Linux and Android; Windows builds Windows and Android. Select one target or
+The command detects the host. macOS builds macOS and Android; Linux builds Linux
+and Android; Windows builds Windows and Android. Select one target or
 architecture when needed:
 
 ```bash
@@ -229,7 +247,6 @@ dart run tool/build_all_platforms.dart --target macos --arch all
 dart run tool/build_all_platforms.dart --target linux --arch x86_64
 dart run tool/build_all_platforms.dart --target windows --arch arm64
 dart run tool/build_all_platforms.dart --target android --arch all
-dart run tool/build_all_platforms.dart --target ios --arch arm64
 ```
 
 Run `dart run tool/build_all_platforms.dart --help` for all options. The release
@@ -241,20 +258,19 @@ matrix is:
 | Linux | ARM64, x86_64 | Architecture-specific `.tar.gz` |
 | Windows | ARM64, x86_64 | Architecture-specific `.zip` and `.msix` |
 | Android | ARMv7, ARM64, x86_64 | Split APK per ABI |
-| iOS devices | ARM64 | Unsigned application `.zip` |
 
 Linux and Windows desktop builds must run on a native host matching the target
-architecture. iOS device distribution does not support x86_64. Normal CI keeps
-feedback fast by building ARM macOS and all Android APK architectures. Run
-**Actions → Release → Run workflow** for the complete native matrix, or push a
-`v*` tag to build it and publish a checksummed GitHub prerelease.
+architecture. Normal CI keeps feedback fast by building ARM macOS and all
+Android APK architectures. Run **Actions → Release → Run workflow** for the
+complete enabled native matrix, or push a `v*` tag to build it and publish a
+checksummed GitHub prerelease. iOS distribution is intentionally disabled and
+no iOS artifact is created by the build script or workflows.
 
 Artifacts are written below `build/distributions/<platform>/<architecture>/`.
 Windows MSIX packages enable bundled sounds for delivered notifications under
 package identity. The portable ZIP uses the Windows default for delivered
 notifications, while sound-picker and test-notification previews still play the
-chosen bundled tone in-app. An unsigned iOS build still requires Apple signing
-before installation on a physical device.
+chosen bundled tone in-app.
 
 Flutter's normal macOS output contains both Apple-silicon and Intel code. The
 packaging script builds once, thins both requested releases, then signs and
@@ -280,7 +296,7 @@ per-user XDG data directories and set `Exec` to the installed executable.
 ## Verify changes
 
 ```bash
-dart format --output=none --set-exit-if-changed lib test tool
+dart format --output=none --set-exit-if-changed lib test integration_test tool
 dart run tool/check_code_rules.dart
 flutter analyze
 flutter test
@@ -296,9 +312,9 @@ date filter, minimum-window layouts, phone-sized navigation, and the add-monitor
 flow, including a 200% system-text layout. CI pins Flutter, gates packaging on
 workflow syntax, format, shell syntax, repository rules, analyzer results, and
 the complete test suite, then builds ARM macOS and Android while reproducing all
-four repository screenshots. The release workflow expands that gate to Linux,
-macOS, and Windows x86_64/ARM64, Android ARMv7/ARM64/x86_64, and unsigned iOS
-ARM64.
+four repository screenshots and the Android feature walkthrough. The release
+workflow expands that gate to Linux, macOS, and Windows x86_64/ARM64 plus
+Android ARMv7/ARM64/x86_64. It does not create an iOS distribution.
 
 ## Architecture
 
@@ -363,6 +379,8 @@ state, pause state, and sound selection.
 - `tool/build_all_platforms.dart` — cross-platform release build orchestrator
 - `tool/capture_repository_screenshots.sh` — native macOS and Android light/dark
   screenshot capture used locally and in CI
+- `tool/capture_feature_walkthrough.sh` — records the reproducible Android
+  feature tour with native system bars
 - `tool/package_macos_minimal.sh` — split-symbol, architecture-specific macOS
   release packaging
 - `tool/package_linux_release.sh` — relocatable, compressed Linux release
@@ -373,6 +391,7 @@ state, pause state, and sound selection.
   assertions, drifting package/brand metadata, missing generated assets, and
   mismatched Flutter/Android sound copies
 - `test` — unit, persistence, controller, network, and responsive widget tests
+- `integration_test` — device-driven, end-to-end feature walkthrough
 
 ### Architecture invariants
 

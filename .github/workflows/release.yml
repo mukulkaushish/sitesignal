@@ -175,12 +175,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - name: Download release artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: sitesignal-*
           path: release-assets
           merge-multiple: true
+      - name: Include feature walkthrough
+        run: >-
+          cp docs/walkthrough/sitesignal-android.mp4
+          release-assets/sitesignal-android-walkthrough.mp4
       - name: Create checksums
         run: |
           find release-assets -type f -print0 \
