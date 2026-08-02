@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SiteSignal
+Comment=Local-first website health monitoring
+Exec=site_signal
+Icon=dev.sitesignal.SiteSignal
+Terminal=false
+Categories=Network;Utility;
+StartupNotify=true
+StartupWMClass=site_signal
