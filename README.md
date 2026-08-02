@@ -189,7 +189,5 @@ sanitized `example.com` data in screenshots, tests, logs, and issues.
 
 ## License
 
-> [!WARNING]
-> A `LICENSE` file still needs to be selected before this project is open
-> source in the legal sense. Choose a license such as MIT, Apache-2.0, or
-> GPL-3.0 before accepting or redistributing contributions.
+SiteSignal is open source under the [MIT License](LICENSE). You may use,
+modify, and share it under the license terms.

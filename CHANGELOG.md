@@ -8,6 +8,7 @@ Notable user-visible changes to SiteSignal are recorded here. The project uses
 ### Added
 
 - Initial public-release documentation and GitHub contribution templates.
+- MIT open-source licensing.
 - Cross-platform local website monitoring for macOS, Linux, Windows, and
   Android.
 - Same-origin health-probe discovery, connectivity-aware outage detection, and
