@@ -18,11 +18,13 @@ class SiteSignalApp extends StatefulWidget {
   const SiteSignalApp({
     required this.controller,
     required this.applicationVersion,
+    this.initialSection = DashboardSection.overview,
     super.key,
   });
 
   final MonitorController controller;
   final String applicationVersion;
+  final DashboardSection initialSection;
 
   @override
   State<SiteSignalApp> createState() => _SiteSignalAppState();
@@ -84,6 +86,7 @@ class _SiteSignalAppState extends State<SiteSignalApp>
       home: DashboardShell(
         controller: widget.controller,
         applicationVersion: widget.applicationVersion,
+        initialSection: widget.initialSection,
       ),
     );
   }
@@ -115,20 +118,28 @@ class DashboardShell extends StatefulWidget {
   const DashboardShell({
     required this.controller,
     required this.applicationVersion,
+    this.initialSection = DashboardSection.overview,
     super.key,
   });
 
   final MonitorController controller;
   final String applicationVersion;
+  final DashboardSection initialSection;
 
   @override
   State<DashboardShell> createState() => _DashboardShellState();
 }
 
 class _DashboardShellState extends State<DashboardShell> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
-  static const _destinations = _Destination.values;
+  static const _destinations = DashboardSection.values;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialSection.index;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +183,7 @@ class _DashboardShellState extends State<DashboardShell> {
                     controller: widget.controller,
                     summary: summary,
                     title: selectedDestination.label,
-                    onAddSite: selectedDestination == _Destination.overview
+                    onAddSite: selectedDestination == DashboardSection.overview
                         ? _showAddSite
                         : null,
                   ),
@@ -248,7 +259,7 @@ class _DashboardShellState extends State<DashboardShell> {
   }
 }
 
-enum _Destination {
+enum DashboardSection {
   overview(
     label: 'Overview',
     icon: Icons.space_dashboard_outlined,
@@ -265,7 +276,7 @@ enum _Destination {
     selectedIcon: Icons.tune_rounded,
   );
 
-  const _Destination({
+  const DashboardSection({
     required this.label,
     required this.icon,
     required this.selectedIcon,
@@ -282,13 +293,13 @@ enum _Destination {
     required String applicationVersion,
   }) {
     return switch (this) {
-      _Destination.overview => OverviewView(
+      DashboardSection.overview => OverviewView(
         controller: controller,
         summary: summary,
         onAddSite: onAddSite,
       ),
-      _Destination.history => HistoryView(controller: controller),
-      _Destination.settings => SettingsView(
+      DashboardSection.history => HistoryView(controller: controller),
+      DashboardSection.settings => SettingsView(
         controller: controller,
         applicationVersion: applicationVersion,
       ),
@@ -307,7 +318,7 @@ class _Sidebar extends StatelessWidget {
 
   final MonitorController controller;
   final MonitorFleetSummary summary;
-  final List<_Destination> destinations;
+  final List<DashboardSection> destinations;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
@@ -424,7 +435,7 @@ class _SidebarDestination extends StatelessWidget {
     required this.onTap,
   });
 
-  final _Destination destination;
+  final DashboardSection destination;
   final bool selected;
   final VoidCallback onTap;
 

@@ -9,16 +9,14 @@ import '../test/support/demo_app.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('walks through the complete responsive feature set', (
-    tester,
-  ) async {
+  testWidgets('exercises the complete responsive feature set', (tester) async {
     final controller = await createDemoMonitorController();
     await tester.pumpWidget(
       SiteSignalApp(controller: controller, applicationVersion: '1.0.0'),
     );
     await tester.pumpAndSettle();
 
-    debugPrint('WALKTHROUGH_READY');
+    debugPrint('FEATURE_FLOW_READY');
     await _hold(tester, const Duration(seconds: 3));
 
     // Add a sanitized example monitor and show interval selection.
@@ -151,7 +149,7 @@ void main() {
     await tester.tap(find.text('Overview').last);
     await tester.pumpAndSettle();
     await _hold(tester, const Duration(seconds: 3));
-    debugPrint('WALKTHROUGH_COMPLETE');
+    debugPrint('FEATURE_FLOW_COMPLETE');
   });
 }
 
@@ -165,11 +163,10 @@ Future<void> _openFirstMonitorMenu(WidgetTester tester) async {
 
 Future<void> _hold(
   WidgetTester tester, [
-  Duration duration = const Duration(milliseconds: 1200),
+  Duration duration = const Duration(milliseconds: 100),
 ]) async {
   await tester.pumpAndSettle();
-  await tester.runAsync<void>(() => Future<void>.delayed(duration));
-  await tester.pump();
+  await tester.pump(duration);
 }
 
 Future<void> _dismissKeyboard(WidgetTester tester) async {

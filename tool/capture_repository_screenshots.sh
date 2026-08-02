@@ -34,8 +34,8 @@ disable_android_demo_mode() {
 }
 
 capture_macos() {
-  local theme="$1"
-  local output="$screenshot_directory/macos-$theme.png"
+  local page="$1"
+  local output="$screenshot_directory/macos-$page-light.png"
   local capture_log
   local generated_output
 
@@ -44,7 +44,7 @@ capture_macos() {
   flutter run \
     --device-id macos \
     --target test/screenshot_main.dart \
-    --dart-define "SCREENSHOT_THEME=$theme" | tee "$capture_log"
+    --dart-define "SCREENSHOT_PAGE=$page" | tee "$capture_log"
 
   generated_output="$(sed -n 's/^SCREENSHOT_SAVED=//p' "$capture_log" | tail -n 1)"
   rm -f "$capture_log"
@@ -54,9 +54,9 @@ capture_macos() {
 }
 
 capture_android() {
-  local theme="$1"
-  local filename="sitesignal-android-$theme.png"
-  local output="$screenshot_directory/android-$theme.png"
+  local page="$1"
+  local filename="sitesignal-android-$page-light.png"
+  local output="$screenshot_directory/android-$page-light.png"
   local capture_log
   local flutter_pid
   local ready=false
@@ -68,7 +68,7 @@ capture_android() {
   flutter run \
     --device-id "$android_device_id" \
     --target test/screenshot_main.dart \
-    --dart-define "SCREENSHOT_THEME=$theme" >"$capture_log" 2>&1 &
+    --dart-define "SCREENSHOT_PAGE=$page" >"$capture_log" 2>&1 &
   flutter_pid=$!
 
   for _ in $(seq 1 180); do
@@ -94,6 +94,10 @@ capture_android() {
     return 1
   fi
 
+  # The in-app marker confirms that Flutter has rendered the target page.
+  # Give SystemUI one more beat to finish applying demo-mode status bars before
+  # capturing the complete physical display.
+  sleep 1
   adb -s "$android_device_id" exec-out screencap -p >"$output"
   kill -INT "$flutter_pid" >/dev/null 2>&1 || true
   wait "$flutter_pid" >/dev/null 2>&1 || true
@@ -105,12 +109,14 @@ capture_android() {
 
 case "$target" in
   macos)
-    capture_macos light
-    capture_macos dark
+    capture_macos overview
+    capture_macos history
+    capture_macos settings
     ;;
   android)
-    capture_android light
-    capture_android dark
+    capture_android overview
+    capture_android history
+    capture_android settings
     ;;
   *)
     echo "Usage: $0 <macos|android>" >&2

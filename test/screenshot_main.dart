@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:site_signal/app/site_signal_app.dart';
-import 'package:site_signal/core/theme/app_theme_preference.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -16,17 +15,20 @@ import 'support/demo_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const themeName = String.fromEnvironment(
-    'SCREENSHOT_THEME',
-    defaultValue: 'dark',
+  const pageName = String.fromEnvironment(
+    'SCREENSHOT_PAGE',
+    defaultValue: 'overview',
   );
+  final section = switch (pageName) {
+    'overview' => DashboardSection.overview,
+    'history' => DashboardSection.history,
+    'settings' => DashboardSection.settings,
+    _ => throw ArgumentError.value(pageName, 'SCREENSHOT_PAGE'),
+  };
   const viewportName = String.fromEnvironment(
     'SCREENSHOT_VIEWPORT',
     defaultValue: 'desktop',
   );
-  final themePreference = themeName == 'light'
-      ? AppThemePreference.light
-      : AppThemePreference.dark;
   if (!kIsWeb && (Platform.isMacOS || Platform.isLinux || Platform.isWindows)) {
     final size = switch (viewportName) {
       'phone' => const Size(430, 932),
@@ -49,17 +51,26 @@ Future<void> main() async {
       ),
     );
   }
-  final controller = await createDemoMonitorController(
-    themePreference: themePreference,
+  final controller = await createDemoMonitorController();
+  runApp(
+    _ScreenshotCapture(
+      controller: controller,
+      pageName: pageName,
+      section: section,
+    ),
   );
-  runApp(_ScreenshotCapture(controller: controller, themeName: themeName));
 }
 
 class _ScreenshotCapture extends StatefulWidget {
-  const _ScreenshotCapture({required this.controller, required this.themeName});
+  const _ScreenshotCapture({
+    required this.controller,
+    required this.pageName,
+    required this.section,
+  });
 
   final MonitorController controller;
-  final String themeName;
+  final String pageName;
+  final DashboardSection section;
 
   @override
   State<_ScreenshotCapture> createState() => _ScreenshotCaptureState();
@@ -102,7 +113,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
         throw StateError('Flutter could not encode the screenshot.');
       }
 
-      final outputFile = await _outputFile(widget.themeName);
+      final outputFile = await _outputFile(widget.pageName);
       await outputFile.parent.create(recursive: true);
       await outputFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
       stdout.writeln('SCREENSHOT_SAVED=${outputFile.path}');
@@ -120,7 +131,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
     }
   }
 
-  Future<File> _outputFile(String themeName) async {
+  Future<File> _outputFile(String pageName) async {
     const requestedPath = String.fromEnvironment('SCREENSHOT_OUTPUT');
     if (requestedPath.isNotEmpty) {
       return File(requestedPath);
@@ -130,7 +141,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
     return File(
       path.join(
         temporaryDirectory.path,
-        'sitesignal-$platformName-$themeName.png',
+        'sitesignal-$platformName-$pageName-light.png',
       ),
     );
   }
@@ -142,6 +153,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
       child: SiteSignalApp(
         controller: widget.controller,
         applicationVersion: '1.0.0',
+        initialSection: widget.section,
       ),
     );
   }

@@ -24,6 +24,16 @@ Future<MonitorController> createDemoMonitorController({
 
 List<SiteMonitor> demoSites() {
   final now = DateTime.now().toUtc();
+  final localNow = DateTime.now();
+  final startOfToday = DateTime(
+    localNow.year,
+    localNow.month,
+    localNow.day,
+  ).toUtc();
+  final elapsedToday = now.difference(startOfToday);
+  final productionTransition = startOfToday.add(
+    Duration(milliseconds: elapsedToday.inMilliseconds ~/ 3),
+  );
   return <SiteMonitor>[
     SiteMonitor(
       id: 'sample-api',
@@ -37,7 +47,7 @@ List<SiteMonitor> demoSites() {
       createdAt: now.subtract(const Duration(days: 30)),
       history: <CheckRecord>[
         CheckRecord(
-          checkedAt: now.subtract(const Duration(minutes: 2)),
+          checkedAt: productionTransition,
           status: HealthStatus.up,
           responseTimeMs: 42,
           statusCode: 200,
@@ -53,6 +63,14 @@ List<SiteMonitor> demoSites() {
           checkedUrl: 'https://api.example.com/readyz',
         ),
       ],
+      lastCheck: CheckRecord(
+        checkedAt: now.subtract(const Duration(minutes: 2)),
+        status: HealthStatus.up,
+        responseTimeMs: 42,
+        statusCode: 200,
+        error: null,
+        checkedUrl: 'https://api.example.com/readyz',
+      ),
     ),
     SiteMonitor(
       id: 'sample-store',
@@ -66,7 +84,7 @@ List<SiteMonitor> demoSites() {
       createdAt: now.subtract(const Duration(days: 14)),
       history: <CheckRecord>[
         CheckRecord(
-          checkedAt: now.subtract(const Duration(minutes: 12)),
+          checkedAt: startOfToday,
           status: HealthStatus.down,
           responseTimeMs: 316,
           statusCode: 503,
@@ -82,6 +100,14 @@ List<SiteMonitor> demoSites() {
           checkedUrl: 'https://shop.example.com/health',
         ),
       ],
+      lastCheck: CheckRecord(
+        checkedAt: now.subtract(const Duration(minutes: 12)),
+        status: HealthStatus.down,
+        responseTimeMs: 316,
+        statusCode: 503,
+        error: 'Server returned HTTP 503.',
+        checkedUrl: 'https://shop.example.com/health',
+      ),
     ),
   ];
 }

@@ -72,7 +72,7 @@ jobs:
           --target macos
           --arch arm64
           --skip-pub-get
-      - name: Capture light and dark screenshots
+      - name: Capture light-mode page collection
         run: ./tool/capture_repository_screenshots.sh macos
       - name: Upload ARM64 distribution
         uses: actions/upload-artifact@v7
@@ -91,7 +91,7 @@ jobs:
           retention-days: 7
 
   android:
-    name: Android build, screenshots, and walkthrough
+    name: Android build and screenshots
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -118,7 +118,7 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Capture screenshots and feature walkthrough
+      - name: Capture screenshots and run the feature flow
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -131,7 +131,7 @@ jobs:
             -no-boot-anim -camera-back none
           script: |
             ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_repository_screenshots.sh android
-            ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_feature_walkthrough.sh android
+            flutter test integration_test/feature_flow_test.dart --device-id emulator-5554
       - name: Upload Android distributions
         uses: actions/upload-artifact@v7
         with:
@@ -147,71 +147,3 @@ jobs:
           path: docs/screenshots/android-*.png
           if-no-files-found: error
           retention-days: 7
-      - name: Upload Android feature walkthrough
-        uses: actions/upload-artifact@v7
-        with:
-          name: sitesignal-walkthrough-android
-          path: docs/walkthrough/sitesignal-android.mp4
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
-
-  verify-screenshots:
-    name: Verify committed screenshots
-    if: github.event_name == 'pull_request'
-    needs: [macos, android]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - name: Download generated screenshots
-        uses: actions/download-artifact@v8
-        with:
-          pattern: sitesignal-screenshots-*
-          path: generated-screenshots
-          merge-multiple: true
-      - name: Compare generated and committed images
-        run: |
-          test -s generated-screenshots/macos-light.png
-          test -s generated-screenshots/macos-dark.png
-          test -s generated-screenshots/android-light.png
-          test -s generated-screenshots/android-dark.png
-          cp generated-screenshots/*.png docs/screenshots/
-          if ! git diff --quiet -- docs/screenshots; then
-            git diff --stat -- docs/screenshots
-            echo "Screenshots are stale. Run the capture script and commit the four images."
-            exit 1
-          fi
-
-  update-screenshots:
-    name: Refresh screenshots on main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [macos, android]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - name: Download generated screenshots
-        uses: actions/download-artifact@v8
-        with:
-          pattern: sitesignal-screenshots-*
-          path: generated-screenshots
-          merge-multiple: true
-      - name: Commit changed screenshots
-        run: |
-          test -s generated-screenshots/macos-light.png
-          test -s generated-screenshots/macos-dark.png
-          test -s generated-screenshots/android-light.png
-          test -s generated-screenshots/android-dark.png
-          cp generated-screenshots/*.png docs/screenshots/
-          if git diff --quiet -- docs/screenshots; then
-            echo "Screenshots are already current."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots
-          git commit -m "docs: refresh platform screenshots [skip ci]"
-          git push
