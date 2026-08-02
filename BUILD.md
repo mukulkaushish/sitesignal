@@ -379,7 +379,7 @@ a GitHub release:
 
 - Linux x86_64 on `ubuntu-latest`
 - Linux ARM64 on `ubuntu-24.04-arm`
-- macOS ARM64 and x86_64 on `macos-15`
+- macOS ARM64 and x86_64 on `macos-26`
 - Windows x86_64 on `windows-latest`
 - Windows ARM64 on `windows-11-arm`
 - Android ARMv7, ARM64, and x86_64 APKs on `ubuntu-latest`
