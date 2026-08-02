@@ -5,7 +5,6 @@ import 'package:path/path.dart' as path;
 const _supportedTargets = <String>{
   'all',
   'android',
-  'ios',
   'linux',
   'macos',
   'windows',
@@ -132,8 +131,6 @@ class _ReleaseBuilder {
       switch (target) {
         case 'android':
           await _buildAndroid();
-        case 'ios':
-          await _buildIos();
         case 'linux':
           await _buildLinux();
         case 'macos':
@@ -151,7 +148,7 @@ class _ReleaseBuilder {
 
   List<String> _targetsForCurrentHost() {
     if (Platform.isMacOS) {
-      return const <String>['macos', 'android', 'ios'];
+      return const <String>['macos', 'android'];
     }
     if (Platform.isLinux) {
       return const <String>['linux', 'android'];
@@ -172,12 +169,12 @@ class _ReleaseBuilder {
       );
     } else if (Platform.isLinux) {
       stdout.writeln(
-        'macOS, iOS, and Windows releases require native runners; the CI '
+        'macOS and Windows releases require native runners; the CI '
         'matrix builds them.',
       );
     } else if (Platform.isWindows) {
       stdout.writeln(
-        'macOS, iOS, and Linux releases require native runners; the CI '
+        'macOS and Linux releases require native runners; the CI '
         'matrix builds them.',
       );
     }
@@ -305,54 +302,6 @@ class _ReleaseBuilder {
       await source.copy(output);
       _recordArtifact(output);
     }
-  }
-
-  Future<void> _buildIos() async {
-    _requireHost(Platform.isMacOS, 'iOS');
-    if (options.architecture != 'all' &&
-        options.architecture != 'host' &&
-        options.architecture != 'arm64') {
-      throw const _BuildException('iOS device releases support ARM64 only.');
-    }
-
-    await _run('flutter', <String>[
-      'build',
-      'ios',
-      '--release',
-      '--no-codesign',
-      '--split-debug-info=${path.join(projectDirectory, 'build', 'debug-symbols', 'ios')}',
-    ]);
-    final source = path.join(
-      projectDirectory,
-      'build',
-      'ios',
-      'iphoneos',
-      'Runner.app',
-    );
-    if (!Directory(source).existsSync()) {
-      throw _BuildException('Missing unsigned iOS application: $source');
-    }
-
-    final outputDirectory = Directory(
-      path.join(projectDirectory, 'build', 'distributions', 'ios', 'arm64'),
-    )..createSync(recursive: true);
-    final output = path.join(
-      outputDirectory.path,
-      'SiteSignal-ios-arm64-unsigned.zip',
-    );
-    final oldOutput = File(output);
-    if (oldOutput.existsSync()) {
-      oldOutput.deleteSync();
-    }
-    await _run('/usr/bin/ditto', <String>[
-      '-c',
-      '-k',
-      '--sequesterRsrc',
-      '--keepParent',
-      source,
-      output,
-    ]);
-    _recordArtifact(output);
   }
 
   String _macosArchitecture() {
@@ -565,7 +514,7 @@ Usage:
   dart run tool/build_all_platforms.dart [options]
 
 Options:
-  --target <target>  all, android, ios, linux, macos, or windows.
+  --target <target>  all, android, linux, macos, or windows.
                      Default: all targets supported by the current host.
   --arch <arch>      all, host, arm32, arm64, or x86_64 (x64 is accepted).
                      Default: all; native desktop builds use the host arch.
@@ -578,7 +527,7 @@ Examples:
   dart run tool/build_all_platforms.dart --target linux --arch x86_64
   dart run tool/build_all_platforms.dart --target windows --arch arm64
 
-Linux and Windows desktop releases must be built on matching native hosts.
-iOS device releases support ARM64 only. The CI matrix supplies every required
-native host and invokes this same script for each platform/architecture.
+Linux and Windows desktop releases must be built on matching native hosts. The
+CI matrix supplies every required native host and invokes this same script for
+each platform/architecture. iOS distribution is intentionally disabled.
 ''';
