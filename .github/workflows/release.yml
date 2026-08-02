@@ -184,10 +184,6 @@ jobs:
           pattern: sitesignal-*
           path: release-assets
           merge-multiple: true
-      - name: Include feature walkthrough
-        run: >-
-          cp docs/walkthrough/sitesignal-android.mp4
-          release-assets/sitesignal-android-walkthrough.mp4
       - name: Create checksums
         run: |
           find release-assets -type f -print0 \

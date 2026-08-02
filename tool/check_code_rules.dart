@@ -115,10 +115,6 @@ Future<void> main() async {
       'set(APPLICATION_ID "dev.sitesignal.app")',
     ],
     'windows/runner/Runner.rc': <String>['VALUE "ProductName", "SiteSignal"'],
-    'web/manifest.json': <String>[
-      '"name": "SiteSignal"',
-      '"theme_color": "#2563EB"',
-    ],
     'lib/core/theme/app_accent_color.dart': <String>[
       'static const int defaultValue = 0xFF2563EB;',
     ],
@@ -150,7 +146,6 @@ Future<void> main() async {
     'ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png',
     'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png',
     'windows/runner/resources/app_icon.ico',
-    'web/icons/Icon-512.png',
   ];
   for (final assetPath in requiredAssets) {
     if (!File(assetPath).existsSync()) {

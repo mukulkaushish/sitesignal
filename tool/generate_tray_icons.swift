@@ -269,25 +269,6 @@ try renderAppIcon(
     style: .monochrome
 )
 
-let webIconDirectory = projectDirectory.appendingPathComponent("web/icons", isDirectory: true)
-for dimension in [192, 512] {
-    try renderAppIcon(
-        dimension: CGFloat(dimension),
-        destination: webIconDirectory.appendingPathComponent("Icon-\(dimension).png"),
-        style: .transparentTile
-    )
-    try renderAppIcon(
-        dimension: CGFloat(dimension),
-        destination: webIconDirectory.appendingPathComponent("Icon-maskable-\(dimension).png"),
-        style: .fullBleed
-    )
-}
-try renderAppIcon(
-    dimension: 32,
-    destination: projectDirectory.appendingPathComponent("web/favicon.png"),
-    style: .transparentTile
-)
-
 extension Data {
     mutating func appendLittleEndian(_ value: UInt16) {
         append(UInt8(truncatingIfNeeded: value))
