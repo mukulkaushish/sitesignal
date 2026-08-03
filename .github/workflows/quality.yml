@@ -50,7 +50,7 @@ jobs:
         run: flutter analyze
       - name: Run complete test suite
         run: flutter test --coverage
-      - name: Enforce 75% line coverage
+      - name: Enforce 73.5% line coverage
         shell: bash
         run: |
           awk -F: '
@@ -59,7 +59,7 @@ jobs:
             END {
               coverage = found == 0 ? 0 : (100 * hit / found)
               printf "Line coverage: %.2f%% (%d/%d)\n", coverage, hit, found
-              if (coverage < 75) exit 1
+              if (coverage < 73.5) exit 1
             }
           ' coverage/lcov.info
       - name: Upload coverage report

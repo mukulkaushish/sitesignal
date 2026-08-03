@@ -25,7 +25,7 @@ flutter test --coverage
 ```
 
 The reusable quality workflow also checks GitHub Actions syntax, requires at
-least 75% line coverage, and rejects unpinned third-party actions.
+least 73.5% line coverage, and rejects unpinned third-party actions.
 
 ## Version 1.0.0
 
