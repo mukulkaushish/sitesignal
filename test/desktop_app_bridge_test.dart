@@ -171,6 +171,17 @@ void main() {
     expect(suppressedCustom.sound, isNull);
     expect(suppressedCustom.silent, isTrue);
   });
+
+  test('dashboard menu action follows cached window visibility', () {
+    expect(dashboardMenuActionForVisibility(true), (
+      key: 'hide_window',
+      label: 'Hide Dashboard',
+    ));
+    expect(dashboardMenuActionForVisibility(false), (
+      key: 'show_window',
+      label: 'Show Dashboard',
+    ));
+  });
 }
 
 class _RecordingSoundPreviewPlayer implements NotificationSoundPreviewPlayer {

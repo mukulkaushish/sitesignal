@@ -26,6 +26,13 @@ abstract interface class NotificationSoundPreviewPlayer {
   Future<void> dispose();
 }
 
+typedef DashboardMenuAction = ({String key, String label});
+
+@visibleForTesting
+DashboardMenuAction dashboardMenuActionForVisibility(bool visible) => visible
+    ? (key: 'hide_window', label: 'Hide Dashboard')
+    : (key: 'show_window', label: 'Show Dashboard');
+
 abstract final class AndroidNotificationSoundConfiguration {
   static const _description = 'Outage and recovery alerts for monitored sites';
 
@@ -122,6 +129,7 @@ class DesktopAppBridge
   int _downCount = 0;
   bool _initialized = false;
   bool _quitting = false;
+  bool? _windowVisible;
   final Map<String, Future<void>> _notificationChains =
       <String, Future<void>>{};
   Future<NotificationPermission>? _permissionRequest;
@@ -211,6 +219,7 @@ class DesktopAppBridge
         listenersAdded = true;
         // Close-to-tray is enabled only after the tray is known to be usable.
         await windowManager.setPreventClose(true);
+        _windowVisible = await windowManager.isVisible();
       }
       _initialized = true;
     } on Object {
@@ -249,7 +258,8 @@ class DesktopAppBridge
     _lastSites = List<SiteMonitor>.unmodifiable(sites);
     _lastPaused = paused;
     _sitesById = <String, SiteMonitor>{for (final site in sites) site.id: site};
-    final windowVisible = await windowManager.isVisible();
+    final windowVisible = _windowVisible ??= await windowManager.isVisible();
+    final dashboardAction = dashboardMenuActionForVisibility(windowVisible);
 
     final statusLabel = paused
         ? 'Monitoring paused'
@@ -276,10 +286,7 @@ class DesktopAppBridge
       if (sites.isEmpty)
         MenuItem(label: 'Add a site from the dashboard', disabled: true),
       if (sites.isNotEmpty) MenuItem.separator(),
-      MenuItem(
-        key: windowVisible ? 'hide_window' : 'show_window',
-        label: windowVisible ? 'Hide Dashboard' : 'Open Dashboard',
-      ),
+      MenuItem(key: dashboardAction.key, label: dashboardAction.label),
       MenuItem(
         key: 'check_all',
         label: 'Check All Now',
@@ -787,11 +794,17 @@ class DesktopAppBridge
     if (!_isDesktop) {
       return;
     }
+    _windowVisible = true;
     // Restore the Dock/taskbar presence before showing, so the window can
     // become key/frontmost normally.
-    await windowManager.setSkipTaskbar(false);
-    await windowManager.show();
-    await windowManager.focus();
+    try {
+      await windowManager.setSkipTaskbar(false);
+      await windowManager.show();
+      await windowManager.focus();
+    } on Object {
+      _windowVisible = null;
+      rethrow;
+    }
     await _refreshMenu();
   }
 
@@ -799,15 +812,23 @@ class DesktopAppBridge
     if (!_isDesktop) {
       return;
     }
+    // Keep the menu tied to the requested state. On macOS, isVisible() can
+    // briefly report the old value after orderOut/hide completes.
+    _windowVisible = false;
     // macOS only orders out a window once it's no longer key; hiding it while
     // it's still focused silently no-ops on the first call.
-    if (Platform.isMacOS) {
-      await windowManager.blur();
+    try {
+      if (Platform.isMacOS) {
+        await windowManager.blur();
+      }
+      await windowManager.hide();
+      // Drop the Dock icon/taskbar entry too; the tray icon remains the way
+      // back in, matching a proper background/menu-bar-only app.
+      await windowManager.setSkipTaskbar(true);
+    } on Object {
+      _windowVisible = null;
+      rethrow;
     }
-    await windowManager.hide();
-    // Drop the Dock icon/taskbar entry too; the tray icon remains the way
-    // back in, matching a proper background/menu-bar-only app.
-    await windowManager.setSkipTaskbar(true);
     await _refreshMenu();
   }
 
