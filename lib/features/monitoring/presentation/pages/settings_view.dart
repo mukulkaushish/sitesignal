@@ -303,6 +303,15 @@ class SettingsView extends StatelessWidget {
             ),
             const SizedBox(height: AppDimensions.s24),
             _SettingsSection(
+              title: 'Updates',
+              subtitle: 'Check the official stable releases on GitHub.',
+              child: _UpdateSettingsCard(
+                controller: controller,
+                applicationVersion: applicationVersion,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.s24),
+            _SettingsSection(
               title: 'About',
               subtitle: 'Local-first website health monitoring.',
               child: SectionCard(
@@ -422,6 +431,104 @@ class SettingsView extends StatelessWidget {
       return 'Android app lifecycle';
     }
     return 'Local app lifecycle';
+  }
+}
+
+class _UpdateSettingsCard extends StatelessWidget {
+  const _UpdateSettingsCard({
+    required this.controller,
+    required this.applicationVersion,
+  });
+
+  final MonitorController controller;
+  final String applicationVersion;
+
+  @override
+  Widget build(BuildContext context) {
+    final update = controller.availableUpdate;
+    final title = update == null
+        ? 'Installed version $applicationVersion'
+        : 'SiteSignal ${update.version} is available';
+    final description = controller.isCheckingForUpdate
+        ? 'Checking GitHub Releases…'
+        : update != null
+        ? 'A newer stable version is available. Updating is recommended.'
+        : controller.updateCheckMessage ??
+              'SiteSignal checks once a day and never installs updates silently.';
+    final action = update == null
+        ? OutlinedButton.icon(
+            key: const ValueKey('check-for-updates'),
+            onPressed: controller.isCheckingForUpdate
+                ? null
+                : () => unawaited(controller.checkForUpdates()),
+            icon: controller.isCheckingForUpdate
+                ? const SizedBox.square(
+                    dimension: AppDimensions.s16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            label: Text(
+              controller.isCheckingForUpdate ? 'Checking…' : 'Check now',
+            ),
+          )
+        : FilledButton.icon(
+            key: const ValueKey('open-update-release'),
+            onPressed: () => unawaited(controller.openAvailableUpdate()),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('View update'),
+          );
+
+    final details = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TonalIconBadge(
+          icon: update == null
+              ? Icons.system_update_outlined
+              : Icons.system_update_alt_rounded,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        const SizedBox(width: AppDimensions.s12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: AppDimensions.s2),
+              Text(
+                description,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    return SectionCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 520) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                details,
+                const SizedBox(height: AppDimensions.s12),
+                Align(alignment: Alignment.centerRight, child: action),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: details),
+              const SizedBox(width: AppDimensions.s16),
+              action,
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

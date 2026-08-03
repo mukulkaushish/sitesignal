@@ -45,7 +45,7 @@ void main() {
     expect(result.status, HealthStatus.down);
     expect(result.statusCode, 503);
     expect(result.error, 'Server returned HTTP 503');
-    expect(result.failureDetail, contains('7 common health endpoints'));
+    expect(result.failureDetail, contains('12 common health endpoints'));
     expect(result.failureDetail, isNot(contains('/healthz')));
   });
 
@@ -104,6 +104,85 @@ void main() {
     expect(requested, contains('https://example.com/livez'));
   });
 
+  test('discovers the Quarkus aggregate health endpoint', () async {
+    final requested = <String>[];
+    final checker = HttpHealthChecker(
+      client: MockClient((request) async {
+        requested.add(request.url.toString());
+        return http.Response('', request.url.path == '/q/health' ? 200 : 404);
+      }),
+    );
+
+    final result = await checker.check(Uri.parse('https://example.com'));
+
+    expect(result.status, HealthStatus.up);
+    expect(result.checkedUrl, 'https://example.com/q/health');
+    expect(requested, contains('https://example.com/q/health'));
+  });
+
+  test('follows health redirects only within the monitored origin', () async {
+    final requested = <String>[];
+    final checker = HttpHealthChecker(
+      client: MockClient((request) async {
+        requested.add(request.url.toString());
+        if (request.url.path.isEmpty) {
+          return http.Response('Unavailable', 503);
+        }
+        if (request.url.path == '/health') {
+          return http.Response(
+            '',
+            302,
+            headers: const <String, String>{'location': '/health/ready'},
+          );
+        }
+        return http.Response(
+          '',
+          request.url.path == '/health/ready' ? 200 : 404,
+        );
+      }),
+    );
+
+    final result = await checker.check(Uri.parse('https://example.com'));
+
+    expect(result.status, HealthStatus.up);
+    expect(result.checkedUrl, 'https://example.com/health');
+    expect(requested, contains('https://example.com/health/ready'));
+  });
+
+  test(
+    'never follows a discovered health redirect to another origin',
+    () async {
+      final requested = <Uri>[];
+      final checker = HttpHealthChecker(
+        client: MockClient((request) async {
+          requested.add(request.url);
+          if (request.url.path.isEmpty) {
+            return http.Response('Unavailable', 503);
+          }
+          if (request.url.path == '/health') {
+            return http.Response(
+              '',
+              302,
+              headers: const <String, String>{
+                'location': 'https://other.example/health',
+              },
+            );
+          }
+          return http.Response('', 404);
+        }),
+      );
+
+      final result = await checker.check(Uri.parse('https://example.com'));
+
+      expect(result.status, HealthStatus.down);
+      expect(
+        requested,
+        isNot(contains(Uri.parse('https://other.example/health'))),
+      );
+      expect(requested.every((uri) => uri.host == 'example.com'), isTrue);
+    },
+  );
+
   test('falls back from a failed remembered probe to the base URL', () async {
     final checker = HttpHealthChecker(
       client: MockClient((request) async {
@@ -140,7 +219,7 @@ void main() {
     expect(result.status, HealthStatus.down);
     expect(result.error, 'Page is stuck on “Loading…”');
     expect(result.failureDetail, contains('answered with HTTP 200'));
-    expect(result.failureDetail, contains('7 common health endpoints'));
+    expect(result.failureDetail, contains('12 common health endpoints'));
     expect(result.failureDetail, isNot(contains('/healthz')));
     expect(requested, contains('https://bi.example.com/health'));
   });

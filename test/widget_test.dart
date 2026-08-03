@@ -9,6 +9,7 @@ import 'package:site_signal/features/monitoring/domain/entities/notification_sou
 import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
 import 'package:site_signal/features/monitoring/presentation/pages/overview_view.dart';
+import 'package:site_signal/features/updates/domain/entities/app_update.dart';
 
 import 'support/fakes.dart';
 
@@ -20,6 +21,45 @@ Widget _testApp(MonitorController controller) {
 }
 
 void main() {
+  testWidgets('recommends an available stable update', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final bridge = FakeDesktopBridge();
+    final controller = MonitorController(
+      repository: MemoryMonitorRepository(paused: true),
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: FakeFaviconResolver(),
+      desktopBridge: bridge,
+      updateChecker: FakeUpdateChecker(
+        result: const AppUpdate(
+          version: '1.0.2',
+          releaseUrl:
+              'https://github.com/mukulkaushish/sitesignal/releases/tag/v1.0.2',
+        ),
+      ),
+      schedulerInterval: const Duration(days: 1),
+    );
+    await controller.initialize();
+    await controller.checkForUpdates();
+
+    await tester.pumpWidget(_testApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('SiteSignal 1.0.2 is available. Updating is recommended.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('view-available-update')));
+    await tester.pump();
+    expect(bridge.openedUrls, <String>[
+      'https://github.com/mukulkaushish/sitesignal/releases/tag/v1.0.2',
+    ]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('adds a website from the empty dashboard', (tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;

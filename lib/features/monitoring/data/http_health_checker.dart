@@ -27,8 +27,13 @@ class HttpHealthChecker implements HealthChecker {
     '/healthz',
     '/livez',
     '/readyz',
+    '/health/live',
+    '/health/ready',
     '/api/health',
     '/actuator/health',
+    '/q/health',
+    '/-/healthy',
+    '/-/ready',
     '/status',
   ];
 
@@ -110,20 +115,68 @@ class HttpHealthChecker implements HealthChecker {
     required bool allowHtml,
   }) async {
     final stopwatch = Stopwatch()..start();
+    var currentUri = uri;
+    var redirectCount = 0;
 
     try {
-      final request = http.Request('GET', uri)
-        ..followRedirects = true
-        ..maxRedirects = 5
-        ..headers.addAll(const <String, String>{
-          'Accept': '*/*',
-          'Cache-Control': 'no-cache',
-          'User-Agent': 'SiteSignal/1.0 website-health-monitor',
-        });
+      late http.StreamedResponse response;
+      while (true) {
+        final request = http.Request('GET', currentUri)
+          ..followRedirects = false
+          ..headers.addAll(const <String, String>{
+            'Accept':
+                'application/health+json, application/json, '
+                'text/plain;q=0.9, */*;q=0.1',
+            'Cache-Control': 'no-cache',
+            'User-Agent': 'SiteSignal website-health-monitor',
+          });
 
-      final response = await _client.send(request).timeout(timeout);
+        response = await _client
+            .send(request)
+            .timeout(_remainingTimeout(stopwatch));
+        final location = response.headers['location'];
+        if (!_isRedirect(response.statusCode) ||
+            location == null ||
+            redirectCount >= 5) {
+          break;
+        }
+
+        Uri redirectUri;
+        try {
+          redirectUri = currentUri.resolve(location).removeFragment();
+        } on FormatException {
+          break;
+        }
+        if (!_isHttpUri(redirectUri) ||
+            !_sameOrigin(_origin(uri), redirectUri)) {
+          await response.stream
+              .timeout(_remainingTimeout(stopwatch))
+              .drain<void>();
+          stopwatch.stop();
+          return HealthCheckResult(
+            status: HealthStatus.down,
+            checkedAt: DateTime.now().toUtc(),
+            responseTimeMs: stopwatch.elapsedMilliseconds,
+            statusCode: response.statusCode,
+            error: 'Redirect left the monitored site',
+            failureDetail:
+                'SiteSignal did not follow a health-check redirect to a '
+                'different origin.',
+            checkedUrl: uri.toString(),
+          );
+        }
+
+        await response.stream
+            .timeout(_remainingTimeout(stopwatch))
+            .drain<void>();
+        currentUri = redirectUri;
+        redirectCount += 1;
+      }
+
       final bodyBytes = <int>[];
-      await for (final chunk in response.stream.timeout(timeout)) {
+      await for (final chunk in response.stream.timeout(
+        _remainingTimeout(stopwatch),
+      )) {
         final remaining = _maximumInspectedBodyBytes - bodyBytes.length;
         if (remaining <= 0) {
           break;
@@ -296,6 +349,23 @@ class HttpHealthChecker implements HealthChecker {
     }
     return '${(duration.inMilliseconds / 1000).toStringAsFixed(1)} seconds';
   }
+
+  Duration _remainingTimeout(Stopwatch stopwatch) {
+    final remaining = timeout - stopwatch.elapsed;
+    if (remaining <= Duration.zero) {
+      throw TimeoutException('Health check exceeded its timeout.');
+    }
+    return remaining;
+  }
+
+  bool _isRedirect(int statusCode) =>
+      statusCode == 301 ||
+      statusCode == 302 ||
+      statusCode == 303 ||
+      statusCode == 307 ||
+      statusCode == 308;
+
+  bool _isHttpUri(Uri uri) => uri.scheme == 'http' || uri.scheme == 'https';
 
   _HealthFailure? _contentIssue({
     required int statusCode,

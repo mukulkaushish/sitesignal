@@ -15,6 +15,8 @@ import 'package:site_signal/features/monitoring/data/sqlite_monitor_repository.d
 import 'package:site_signal/features/monitoring/domain/repositories/monitor_repository.dart';
 import 'package:site_signal/features/monitoring/domain/services/background_monitor.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
+import 'package:site_signal/features/updates/data/github_release_update_checker.dart';
+import 'package:site_signal/features/updates/domain/services/update_checker.dart';
 import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
@@ -52,8 +54,13 @@ Future<void> main() async {
   }
 
   var applicationVersion = 'Version unavailable';
+  UpdateChecker updateChecker = const DisabledUpdateChecker();
   try {
-    applicationVersion = (await PackageInfo.fromPlatform()).displayVersion;
+    final packageInfo = await PackageInfo.fromPlatform();
+    applicationVersion = packageInfo.displayVersion;
+    updateChecker = GitHubReleaseUpdateChecker(
+      installedVersion: packageInfo.version,
+    );
   } on Object catch (error) {
     debugPrint('Could not read application version: $error');
   }
@@ -72,6 +79,7 @@ Future<void> main() async {
     faviconResolver: HttpFaviconResolver(),
     desktopBridge: DesktopAppBridge(),
     internetConnectivityChecker: HttpInternetConnectivityChecker(),
+    updateChecker: updateChecker,
     backgroundMonitor: !kIsWeb && (Platform.isAndroid || Platform.isIOS)
         ? MobileBackgroundMonitor()
         : const UnsupportedBackgroundMonitor(),

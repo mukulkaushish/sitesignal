@@ -11,6 +11,8 @@ import 'package:site_signal/features/monitoring/domain/services/desktop_bridge.d
 import 'package:site_signal/features/monitoring/domain/services/favicon_resolver.dart';
 import 'package:site_signal/features/monitoring/domain/services/health_checker.dart';
 import 'package:site_signal/features/monitoring/domain/services/internet_connectivity.dart';
+import 'package:site_signal/features/updates/domain/entities/app_update.dart';
+import 'package:site_signal/features/updates/domain/services/update_checker.dart';
 
 class MemoryMonitorRepository implements MonitorRepository {
   MemoryMonitorRepository({
@@ -245,6 +247,30 @@ class FakeDesktopBridge implements DesktopBridge {
   @override
   void dispose() {
     disposed = true;
+  }
+}
+
+class FakeUpdateChecker implements UpdateChecker {
+  FakeUpdateChecker({this.result, this.error});
+
+  AppUpdate? result;
+  Object? error;
+  int checkCount = 0;
+  bool closed = false;
+
+  @override
+  Future<AppUpdate?> checkForUpdate() async {
+    checkCount += 1;
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return result;
+  }
+
+  @override
+  void close() {
+    closed = true;
   }
 }
 

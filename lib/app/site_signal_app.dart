@@ -13,6 +13,7 @@ import 'package:site_signal/features/monitoring/presentation/pages/history_view.
 import 'package:site_signal/features/monitoring/presentation/pages/overview_view.dart';
 import 'package:site_signal/features/monitoring/presentation/pages/settings_view.dart';
 import 'package:site_signal/features/monitoring/presentation/widgets/monitor_dialog.dart';
+import 'package:site_signal/features/updates/presentation/widgets/update_banner.dart';
 
 class SiteSignalApp extends StatefulWidget {
   const SiteSignalApp({
@@ -188,6 +189,12 @@ class _DashboardShellState extends State<DashboardShell> {
                         : null,
                   ),
                   const Divider(height: 1),
+                  if (widget.controller.availableUpdate case final update?)
+                    UpdateBanner(
+                      update: update,
+                      onViewRelease: () =>
+                          unawaited(widget.controller.openAvailableUpdate()),
+                    ),
                   Expanded(
                     child: IndexedStack(
                       index: _selectedIndex,

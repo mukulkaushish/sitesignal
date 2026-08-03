@@ -19,6 +19,8 @@ import 'package:site_signal/features/monitoring/domain/services/health_checker.d
 import 'package:site_signal/features/monitoring/domain/services/health_result_reducer.dart';
 import 'package:site_signal/features/monitoring/domain/services/internet_connectivity.dart';
 import 'package:site_signal/features/monitoring/domain/services/monitoring_policy.dart';
+import 'package:site_signal/features/updates/domain/entities/app_update.dart';
+import 'package:site_signal/features/updates/domain/services/update_checker.dart';
 
 class MonitorController extends ChangeNotifier {
   MonitorController({
@@ -28,6 +30,7 @@ class MonitorController extends ChangeNotifier {
     required this.desktopBridge,
     this.backgroundMonitor = const UnsupportedBackgroundMonitor(),
     this.internetConnectivityChecker = const AssumedOnlineConnectivityChecker(),
+    this.updateChecker = const DisabledUpdateChecker(),
     this.historyLimit = defaultMonitorHistoryLimit,
     this.schedulerInterval = const Duration(seconds: 1),
     this.connectivityDebounce = const Duration(milliseconds: 750),
@@ -52,6 +55,7 @@ class MonitorController extends ChangeNotifier {
   final DesktopBridge desktopBridge;
   final BackgroundMonitor backgroundMonitor;
   final InternetConnectivityChecker internetConnectivityChecker;
+  final UpdateChecker updateChecker;
   final int historyLimit;
   final Duration schedulerInterval;
   final Duration connectivityDebounce;
@@ -66,6 +70,7 @@ class MonitorController extends ChangeNotifier {
   StreamSubscription<void>? _connectivitySubscription;
   Future<void>? _initialization;
   Future<void>? _resumeOperation;
+  Future<void>? _updateCheckOperation;
   final SerialTaskQueue _saveQueue = SerialTaskQueue();
   final SerialTaskQueue _backgroundSyncQueue = SerialTaskQueue();
   final SerialTaskQueue _menuUpdateQueue = SerialTaskQueue();
@@ -84,7 +89,11 @@ class MonitorController extends ChangeNotifier {
   bool _launchAtStartupSupported = false;
   bool _launchAtStartupEnabled = false;
   bool _updatingLaunchAtStartup = false;
+  bool _checkingForUpdate = false;
   String? _errorMessage;
+  String? _updateCheckMessage;
+  AppUpdate? _availableUpdate;
+  DateTime? _lastUpdateCheckAt;
   NotificationPermission _notificationPermission =
       NotificationPermission.unsupported;
   BackgroundMonitoringStatus _backgroundMonitoringStatus =
@@ -115,6 +124,9 @@ class MonitorController extends ChangeNotifier {
   bool get launchAtStartupSupported => _launchAtStartupSupported;
   bool get launchAtStartupEnabled => _launchAtStartupEnabled;
   bool get isUpdatingLaunchAtStartup => _updatingLaunchAtStartup;
+  bool get isCheckingForUpdate => _checkingForUpdate;
+  String? get updateCheckMessage => _updateCheckMessage;
+  AppUpdate? get availableUpdate => _availableUpdate;
   MonitorFleetSummary get fleetSummary => _sites.fleetSummary;
   bool get isCheckingAny => _checkingIds.isNotEmpty;
 
@@ -267,6 +279,7 @@ class MonitorController extends ChangeNotifier {
       unawaited(checkAll());
     }
     unawaited(_resolveMissingFavicons());
+    unawaited(checkForUpdates(reportErrors: false));
   }
 
   Future<void> handleAppResumed() {
@@ -345,6 +358,12 @@ class MonitorController extends ChangeNotifier {
       unawaited(recheckConnectivity());
     }
     _checkDueSites();
+    final lastUpdateCheckAt = _lastUpdateCheckAt;
+    if (lastUpdateCheckAt == null ||
+        DateTime.now().toUtc().difference(lastUpdateCheckAt) >=
+            const Duration(hours: 24)) {
+      unawaited(checkForUpdates(reportErrors: false));
+    }
   }
 
   Future<SiteMonitor> addSite({
@@ -846,6 +865,67 @@ class MonitorController extends ChangeNotifier {
     }
   }
 
+  Future<void> checkForUpdates({bool reportErrors = true}) {
+    if (_disposed) {
+      return Future<void>.value();
+    }
+    final existing = _updateCheckOperation;
+    if (existing != null) {
+      return existing;
+    }
+
+    late final Future<void> operation;
+    operation = _checkForUpdates(reportErrors: reportErrors).whenComplete(() {
+      if (identical(_updateCheckOperation, operation)) {
+        _updateCheckOperation = null;
+      }
+    });
+    _updateCheckOperation = operation;
+    return operation;
+  }
+
+  Future<void> _checkForUpdates({required bool reportErrors}) async {
+    _checkingForUpdate = true;
+    _lastUpdateCheckAt = DateTime.now().toUtc();
+    if (reportErrors) {
+      _updateCheckMessage = null;
+    }
+    _notifySafely();
+
+    try {
+      final update = await updateChecker.checkForUpdate();
+      if (_disposed) {
+        return;
+      }
+      _availableUpdate = update;
+      _updateCheckMessage = reportErrors && update == null
+          ? 'SiteSignal is up to date.'
+          : null;
+    } on Object catch (error) {
+      if (!_disposed && reportErrors) {
+        _updateCheckMessage = 'Could not check for updates: $error';
+      }
+    } finally {
+      if (!_disposed) {
+        _checkingForUpdate = false;
+        _notifySafely();
+      }
+    }
+  }
+
+  Future<void> openAvailableUpdate() async {
+    final update = _availableUpdate;
+    if (update == null) {
+      return;
+    }
+    try {
+      await desktopBridge.openUrl(update.releaseUrl);
+    } on Object catch (error) {
+      _errorMessage = 'Could not open the SiteSignal update: $error';
+      _notifySafely();
+    }
+  }
+
   Future<void> openNotificationSettings() async {
     try {
       final opened = await desktopBridge.openNotificationSettings();
@@ -1298,6 +1378,7 @@ class MonitorController extends ChangeNotifier {
     _connectivitySubscription = null;
     final initialization = _initialization;
     final resumeOperation = _resumeOperation;
+    final updateCheckOperation = _updateCheckOperation;
     final connectivityCheck = _connectivityCheck;
     final activeChecks = List<Future<void>>.of(_activeChecks);
     final operation = (initialization ?? Future<void>.value())
@@ -1309,6 +1390,15 @@ class MonitorController extends ChangeNotifier {
               await resumeOperation;
             } on Object {
               // Resume failures have already been reduced to retained state.
+            }
+          }
+        })
+        .then((_) async {
+          if (updateCheckOperation != null) {
+            try {
+              await updateCheckOperation;
+            } on Object {
+              // Update failures are optional and already reduced to UI state.
             }
           }
         })
@@ -1335,6 +1425,7 @@ class MonitorController extends ChangeNotifier {
           desktopBridge.dispose();
           backgroundMonitor.dispose();
           internetConnectivityChecker.close();
+          updateChecker.close();
           await repository.close();
         });
     _shutdownOperation = operation;

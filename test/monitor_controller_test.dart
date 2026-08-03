@@ -11,6 +11,7 @@ import 'package:site_signal/features/monitoring/domain/services/desktop_bridge.d
 import 'package:site_signal/features/monitoring/domain/services/health_checker.dart';
 import 'package:site_signal/features/monitoring/domain/services/internet_connectivity.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
+import 'package:site_signal/features/updates/domain/entities/app_update.dart';
 
 import 'support/fakes.dart';
 
@@ -436,6 +437,36 @@ void main() {
       expect(bridge.launchAtStartupUpdateCount, 1);
     },
   );
+
+  test('checks for a stable update and opens its release page', () async {
+    final localBridge = FakeDesktopBridge();
+    final updateChecker = FakeUpdateChecker(
+      result: const AppUpdate(
+        version: '1.0.2',
+        releaseUrl:
+            'https://github.com/mukulkaushish/sitesignal/releases/tag/v1.0.2',
+      ),
+    );
+    final localController = MonitorController(
+      repository: MemoryMonitorRepository(paused: true),
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: FakeFaviconResolver(),
+      desktopBridge: localBridge,
+      updateChecker: updateChecker,
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(localController.dispose);
+
+    await localController.initialize();
+    await localController.checkForUpdates();
+    await localController.openAvailableUpdate();
+
+    expect(localController.availableUpdate?.version, '1.0.2');
+    expect(updateChecker.checkCount, 1);
+    expect(localBridge.openedUrls, <String>[
+      'https://github.com/mukulkaushish/sitesignal/releases/tag/v1.0.2',
+    ]);
+  });
 
   test('refreshes launch-at-startup state when the app resumes', () async {
     await controller.initialize();
