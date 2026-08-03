@@ -45,7 +45,7 @@ void main() {
     expect(result.status, HealthStatus.down);
     expect(result.statusCode, 503);
     expect(result.error, 'Server returned HTTP 503');
-    expect(result.failureDetail, contains('6 common health endpoints'));
+    expect(result.failureDetail, contains('7 common health endpoints'));
     expect(result.failureDetail, isNot(contains('/healthz')));
   });
 
@@ -88,6 +88,22 @@ void main() {
     );
   });
 
+  test('discovers the common livez health endpoint', () async {
+    final requested = <String>[];
+    final checker = HttpHealthChecker(
+      client: MockClient((request) async {
+        requested.add(request.url.toString());
+        return http.Response('', request.url.path == '/livez' ? 200 : 404);
+      }),
+    );
+
+    final result = await checker.check(Uri.parse('https://example.com'));
+
+    expect(result.status, HealthStatus.up);
+    expect(result.checkedUrl, 'https://example.com/livez');
+    expect(requested, contains('https://example.com/livez'));
+  });
+
   test('falls back from a failed remembered probe to the base URL', () async {
     final checker = HttpHealthChecker(
       client: MockClient((request) async {
@@ -124,7 +140,7 @@ void main() {
     expect(result.status, HealthStatus.down);
     expect(result.error, 'Page is stuck on “Loading…”');
     expect(result.failureDetail, contains('answered with HTTP 200'));
-    expect(result.failureDetail, contains('6 common health endpoints'));
+    expect(result.failureDetail, contains('7 common health endpoints'));
     expect(result.failureDetail, isNot(contains('/healthz')));
     expect(requested, contains('https://bi.example.com/health'));
   });

@@ -25,6 +25,8 @@ class HttpInternetConnectivityChecker implements InternetConnectivityChecker {
   final ConnectivityChangesProvider? connectivityChanges;
   final Duration timeout;
 
+  static const int _maximumExpectedBodyBytes = 128;
+
   @override
   Stream<void> get changes =>
       (connectivityChanges ?? _connectivity.onConnectivityChanged).map((_) {});
@@ -90,61 +92,162 @@ class HttpInternetConnectivityChecker implements InternetConnectivityChecker {
     );
   }
 
-  Future<bool> _anyProbeSucceeds() {
-    final completed = Completer<bool>();
+  Future<bool> _anyProbeSucceeds() async {
+    final attempts = <_ProbeAttempt>[
+      for (var index = 0; index < _probes.length; index += 1) _ProbeAttempt(),
+    ];
+    final completed = Completer<int?>();
     var remaining = _probes.length;
-    for (final probe in _probes) {
+    final results = <Future<bool>>[];
+    for (var index = 0; index < _probes.length; index += 1) {
+      final result = _runProbe(_probes[index], attempts[index]);
+      results.add(result);
       unawaited(
-        _runProbe(probe).then((reachable) {
-          if (completed.isCompleted) {
-            return;
-          }
-          if (reachable) {
-            completed.complete(true);
-            return;
-          }
+        result.then((reachable) {
           remaining -= 1;
-          if (remaining == 0) {
-            completed.complete(false);
+          if (!completed.isCompleted && reachable) {
+            completed.complete(index);
+          } else if (!completed.isCompleted && remaining == 0) {
+            completed.complete(null);
           }
         }),
       );
     }
-    return completed.future;
+
+    final winner = await completed.future;
+    if (winner != null) {
+      await Future.wait(<Future<void>>[
+        for (var index = 0; index < attempts.length; index += 1)
+          if (index != winner) attempts[index].abort(),
+      ]);
+    }
+    await Future.wait(results);
+    return winner != null;
   }
 
-  Future<bool> _runProbe(_ReachabilityProbe probe) async {
+  Future<bool> _runProbe(
+    _ReachabilityProbe probe,
+    _ProbeAttempt attempt,
+  ) async {
+    final deadline = Timer(timeout, () {
+      unawaited(attempt.abort());
+    });
     try {
-      final request = http.Request('GET', Uri.parse(probe.uri))
-        ..followRedirects = false
-        ..headers.addAll(const <String, String>{
-          'Accept': 'text/plain',
-          'Cache-Control': 'no-cache',
-          'User-Agent': 'SiteSignal/1.0 connectivity-check',
-        });
-      final response = await _client.send(request).timeout(timeout);
-      if (response.statusCode != probe.expectedStatus) {
-        await response.stream.drain<void>().timeout(timeout);
+      final request =
+          http.AbortableRequest(
+              'GET',
+              Uri.parse(probe.uri),
+              abortTrigger: attempt.abortTrigger,
+            )
+            ..followRedirects = false
+            ..headers.addAll(const <String, String>{
+              'Accept': 'text/plain',
+              'Cache-Control': 'no-cache',
+              'User-Agent': 'SiteSignal/1.0 connectivity-check',
+            });
+
+      final responseReady = Completer<http.StreamedResponse?>();
+      unawaited(
+        _client
+            .send(request)
+            .then(
+              (response) {
+                if (!responseReady.isCompleted && !attempt.isAborted) {
+                  responseReady.complete(response);
+                  return;
+                }
+                unawaited(_cancelDetachedResponse(response.stream));
+              },
+              onError: (Object error, StackTrace stackTrace) {
+                if (!responseReady.isCompleted) {
+                  responseReady.completeError(error, stackTrace);
+                }
+              },
+            ),
+      );
+      unawaited(
+        attempt.abortTrigger.then((_) {
+          if (!responseReady.isCompleted) {
+            responseReady.complete(null);
+          }
+        }),
+      );
+
+      final response = await responseReady.future;
+      if (response == null || attempt.isAborted) {
+        if (response != null) {
+          await _cancelDetachedResponse(response.stream);
+        }
         return false;
       }
-      if (probe.expectedBody == null) {
-        await response.stream.drain<void>().timeout(timeout);
-        return true;
-      }
-      final bytes = <int>[];
-      await for (final chunk in response.stream.timeout(timeout)) {
-        final remaining = 128 - bytes.length;
-        if (remaining <= 0) {
-          break;
-        }
-        bytes.addAll(
-          chunk.length <= remaining ? chunk : chunk.sublist(0, remaining),
+
+      final expectedBody = probe.expectedBody;
+      if (response.statusCode != probe.expectedStatus || expectedBody == null) {
+        final subscription = response.stream.listen(
+          (_) {},
+          onError: (Object _, StackTrace _) {},
         );
+        attempt.attachResponse(subscription);
+        await attempt.cancelResponse();
+        return response.statusCode == probe.expectedStatus &&
+            expectedBody == null &&
+            !attempt.isAborted;
       }
-      return utf8.decode(bytes, allowMalformed: true).trim() ==
-          probe.expectedBody;
+
+      final bytes = <int>[];
+      final bodyComplete = Completer<bool>();
+      final subscription = response.stream.listen(
+        (chunk) {
+          if (bodyComplete.isCompleted) {
+            return;
+          }
+          final remaining = _maximumExpectedBodyBytes - bytes.length;
+          if (chunk.length > remaining) {
+            if (remaining > 0) {
+              bytes.addAll(chunk.sublist(0, remaining));
+            }
+            bodyComplete.complete(false);
+            return;
+          }
+          bytes.addAll(chunk);
+        },
+        onError: (Object _, StackTrace _) {
+          if (!bodyComplete.isCompleted) {
+            bodyComplete.complete(false);
+          }
+        },
+        onDone: () {
+          if (!bodyComplete.isCompleted) {
+            bodyComplete.complete(true);
+          }
+        },
+      );
+      attempt.attachResponse(subscription);
+      final completedBody = await Future.any<bool>(<Future<bool>>[
+        bodyComplete.future,
+        attempt.abortTrigger.then((_) => false),
+      ]);
+      await attempt.cancelResponse();
+      return completedBody &&
+          !attempt.isAborted &&
+          utf8.decode(bytes, allowMalformed: true).trim() == expectedBody;
     } on Object {
       return false;
+    } finally {
+      deadline.cancel();
+      await attempt.abort();
+    }
+  }
+
+  Future<void> _cancelDetachedResponse(Stream<List<int>> stream) async {
+    final subscription = stream.listen(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    try {
+      await subscription.cancel();
+    } on Object {
+      // Connectivity assessment is already complete for this response.
     }
   }
 
@@ -179,4 +282,53 @@ class _ReachabilityProbe {
   final String uri;
   final int expectedStatus;
   final String? expectedBody;
+}
+
+final class _ProbeAttempt {
+  final Completer<void> _abort = Completer<void>();
+  StreamSubscription<List<int>>? _responseSubscription;
+  Future<void>? _responseCancellation;
+
+  Future<void> get abortTrigger => _abort.future;
+
+  bool get isAborted => _abort.isCompleted;
+
+  void attachResponse(StreamSubscription<List<int>> subscription) {
+    _responseSubscription = subscription;
+    if (isAborted) {
+      unawaited(cancelResponse());
+    }
+  }
+
+  Future<void> abort() {
+    if (!_abort.isCompleted) {
+      _abort.complete();
+    }
+    return cancelResponse();
+  }
+
+  Future<void> cancelResponse() {
+    final currentCancellation = _responseCancellation;
+    if (currentCancellation != null) {
+      return currentCancellation;
+    }
+    final subscription = _responseSubscription;
+    if (subscription == null) {
+      return Future<void>.value();
+    }
+    _responseSubscription = null;
+    final cancellation = _cancelIgnoringErrors(subscription);
+    _responseCancellation = cancellation;
+    return cancellation;
+  }
+
+  Future<void> _cancelIgnoringErrors(
+    StreamSubscription<List<int>> subscription,
+  ) async {
+    try {
+      await subscription.cancel();
+    } on Object {
+      // Aborting a probe is best effort and must not escape assessment.
+    }
+  }
 }

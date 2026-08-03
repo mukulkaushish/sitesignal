@@ -15,6 +15,10 @@ void main() {
       hasLength(6),
     );
     expect(
+      profiles.every((profile) => profile.androidChannelId.endsWith('_v4')),
+      isTrue,
+    );
+    expect(
       profiles.every((profile) => profile.activeDescription.isNotEmpty),
       isTrue,
     );
@@ -37,6 +41,9 @@ void main() {
       if (assetPath == null || fileName == null || resourceName == null) {
         continue;
       }
+      expect(resourceName, isNot(contains('.')));
+      expect(fileName, '$resourceName.wav');
+      expect(assetPath, 'assets/$fileName');
       expect(File(assetPath).existsSync(), isTrue, reason: assetPath);
       final androidPath = 'android/app/src/main/res/raw/$resourceName.wav';
       expect(File(androidPath).existsSync(), isTrue, reason: androidPath);

@@ -274,6 +274,26 @@ class MobileBackgroundMonitor implements BackgroundMonitor {
   }
 }
 
+final class BackgroundCheckRerunState {
+  bool _requested = false;
+  bool _forceConnectivity = false;
+
+  void request({bool forceConnectivity = false}) {
+    _requested = true;
+    _forceConnectivity |= forceConnectivity;
+  }
+
+  ({bool requested, bool forceConnectivity}) consume() {
+    final result = (
+      requested: _requested,
+      forceConnectivity: _forceConnectivity,
+    );
+    _requested = false;
+    _forceConnectivity = false;
+    return result;
+  }
+}
+
 class _SiteSignalTaskHandler extends TaskHandler {
   final _BackgroundSnapshotStore _snapshotStore =
       const _BackgroundSnapshotStore();
@@ -281,8 +301,8 @@ class _SiteSignalTaskHandler extends TaskHandler {
   final HttpInternetConnectivityChecker _connectivityChecker =
       HttpInternetConnectivityChecker();
   final DesktopAppBridge _bridge = DesktopAppBridge();
+  final BackgroundCheckRerunState _rerunState = BackgroundCheckRerunState();
   bool _checking = false;
-  bool _rerunRequested = false;
   StreamSubscription<void>? _connectivitySubscription;
 
   @override
@@ -326,7 +346,7 @@ class _SiteSignalTaskHandler extends TaskHandler {
     bool forceConnectivity = false,
   }) async {
     if (_checking) {
-      _rerunRequested = true;
+      _rerunState.request(forceConnectivity: forceConnectivity);
       return;
     }
     _checking = true;
@@ -466,9 +486,9 @@ class _SiteSignalTaskHandler extends TaskHandler {
       // long-lived task isolate. The next scheduled event retries cleanly.
     } finally {
       _checking = false;
-      if (_rerunRequested) {
-        _rerunRequested = false;
-        unawaited(_runNow());
+      final rerun = _rerunState.consume();
+      if (rerun.requested) {
+        unawaited(_runNow(forceConnectivity: rerun.forceConnectivity));
       }
     }
   }

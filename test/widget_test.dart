@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:site_signal/app/site_signal_app.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
+import 'package:site_signal/features/monitoring/domain/entities/favicon_image.dart';
 import 'package:site_signal/features/monitoring/domain/entities/notification_sound_preference.dart';
 import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
+import 'package:site_signal/features/monitoring/presentation/pages/overview_view.dart';
 
 import 'support/fakes.dart';
 
@@ -50,8 +54,99 @@ void main() {
     expect(controller.sites.single.baseUrl, 'https://example.com');
     expect(find.text('Base URL'), findsOneWidget);
     expect(find.text('Every 15s'), findsOneWidget);
-    expect(find.byIcon(Icons.public_rounded), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey('site-favicon-fallback-${controller.sites.single.id}'),
+      ),
+      findsOneWidget,
+    );
     expect(controller.sites.single.intervalSeconds, 15);
+  });
+
+  testWidgets('renders safe favicon data from memory only', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final repository = MemoryMonitorRepository(
+      paused: true,
+      sites: <SiteMonitor>[_faviconSite(name: 'Status Portal')],
+    );
+    final controller = MonitorController(
+      repository: repository,
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: FakeFaviconResolver(result: _faviconImage()),
+      desktopBridge: FakeDesktopBridge(),
+      initialState: repository.state,
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.initialize();
+    await tester.pump();
+
+    await tester.pumpWidget(_overviewTestApp(controller));
+    await tester.pump();
+
+    final image = tester.widget<Image>(
+      find.byKey(const ValueKey('site-favicon-image-site-favicon')),
+    );
+    expect(image.image, isA<ResizeImage>());
+    expect((image.image as ResizeImage).imageProvider, isA<MemoryImage>());
+    expect(image.image, isNot(isA<NetworkImage>()));
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await controller.shutdown();
+  });
+
+  testWidgets('legacy and malformed favicons use initials without networking', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final repository = MemoryMonitorRepository(
+      paused: true,
+      sites: <SiteMonitor>[
+        _faviconSite(
+          id: 'legacy-favicon',
+          name: 'Remote Site',
+          faviconUrl: 'https://example.com/favicon.ico',
+        ),
+        _faviconSite(
+          id: 'malformed-favicon',
+          name: 'Broken Data',
+          faviconUrl: 'data:image/png;base64,not-valid-base64',
+        ),
+      ],
+    );
+    final controller = MonitorController(
+      repository: repository,
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: FakeFaviconResolver(),
+      desktopBridge: FakeDesktopBridge(),
+      initialState: repository.state,
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(_overviewTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('site-favicon-fallback-legacy-favicon')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('site-favicon-fallback-malformed-favicon')),
+      findsOneWidget,
+    );
+    expect(find.text('RS'), findsOneWidget);
+    expect(find.text('BD'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('fits every page at the minimum desktop window size', (
@@ -579,3 +674,41 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
+
+Widget _overviewTestApp(MonitorController controller) {
+  return MaterialApp(
+    home: Scaffold(
+      body: OverviewView(
+        controller: controller,
+        summary: controller.fleetSummary,
+        onAddSite: () {},
+      ),
+    ),
+  );
+}
+
+SiteMonitor _faviconSite({
+  String id = 'site-favicon',
+  required String name,
+  String? faviconUrl,
+}) {
+  return SiteMonitor(
+    id: id,
+    name: name,
+    baseUrl: 'https://$id.example.com',
+    probeUrl: null,
+    faviconUrl: faviconUrl,
+    intervalSeconds: 60,
+    enabled: true,
+    status: HealthStatus.unknown,
+    createdAt: DateTime.utc(2026, 8, 3),
+    history: const <CheckRecord>[],
+  );
+}
+
+FaviconImage _faviconImage() => FaviconImage.fromPngBytes(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A'
+    'AQUBAScY42YAAAAASUVORK5CYII=',
+  ),
+);

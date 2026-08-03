@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:site_signal/core/theme/app_dimensions.dart';
 import 'package:site_signal/core/theme/app_semantic_colors.dart';
 import 'package:site_signal/core/widgets/site_signal_logo.dart';
+import 'package:site_signal/features/monitoring/domain/entities/favicon_image.dart';
 import 'package:site_signal/features/monitoring/domain/entities/monitor_fleet_summary.dart';
 import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/domain/services/desktop_bridge.dart';
@@ -668,20 +669,69 @@ class _HealthIssuePanel extends StatelessWidget {
   }
 }
 
-class _SiteFavicon extends StatelessWidget {
+class _SiteFavicon extends StatefulWidget {
   const _SiteFavicon({required this.site, required this.controller});
 
   final SiteMonitor site;
   final MonitorController controller;
 
   @override
+  State<_SiteFavicon> createState() => _SiteFaviconState();
+}
+
+class _SiteFaviconState extends State<_SiteFavicon> {
+  FaviconImage? _scheduledInvalidation;
+
+  @override
+  void didUpdateWidget(covariant _SiteFavicon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.site.id != widget.site.id ||
+        oldWidget.controller != widget.controller) {
+      _scheduledInvalidation = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fallback = Icon(
-      Icons.public_rounded,
-      size: AppDimensions.iconSm,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final fallback = Text(
+      _siteInitials(widget.site),
+      key: ValueKey('site-favicon-fallback-${widget.site.id}'),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.3,
+      ),
     );
-    final faviconUrl = site.faviconUrl;
+    final favicon = widget.controller.faviconForSite(widget.site.id);
+    if (!identical(_scheduledInvalidation, favicon)) {
+      _scheduledInvalidation = null;
+    }
+    final Widget content;
+    if (favicon == null) {
+      content = fallback;
+    } else {
+      content = Padding(
+        padding: const EdgeInsets.all(AppDimensions.s8),
+        child: Image.memory(
+          favicon.pngBytes,
+          key: ValueKey('site-favicon-image-${widget.site.id}'),
+          width: AppDimensions.iconSm,
+          height: AppDimensions.iconSm,
+          cacheWidth:
+              (AppDimensions.iconSm * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+          cacheHeight:
+              (AppDimensions.iconSm * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            _scheduleInvalidation(favicon);
+            return fallback;
+          },
+        ),
+      );
+    }
     return Container(
       width: AppDimensions.s40,
       height: AppDimensions.s40,
@@ -691,36 +741,39 @@ class _SiteFavicon extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimensions.r12),
       ),
       clipBehavior: Clip.antiAlias,
-      child: faviconUrl == null
-          ? fallback
-          : Padding(
-              padding: const EdgeInsets.all(AppDimensions.s8),
-              child: Image.network(
-                faviconUrl,
-                width: AppDimensions.iconSm,
-                height: AppDimensions.iconSm,
-                cacheWidth:
-                    (AppDimensions.iconSm *
-                            MediaQuery.devicePixelRatioOf(context))
-                        .round(),
-                cacheHeight:
-                    (AppDimensions.iconSm *
-                            MediaQuery.devicePixelRatioOf(context))
-                        .round(),
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (context, error, stackTrace) {
-                  scheduleMicrotask(
-                    () => unawaited(
-                      controller.invalidateFavicon(site.id, faviconUrl),
-                    ),
-                  );
-                  return fallback;
-                },
-              ),
-            ),
+      child: content,
     );
   }
+
+  void _scheduleInvalidation(FaviconImage image) {
+    if (identical(_scheduledInvalidation, image)) {
+      return;
+    }
+    _scheduledInvalidation = image;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.controller.invalidateFavicon(widget.site.id, image);
+    });
+  }
+}
+
+String _siteInitials(SiteMonitor site) {
+  final label = site.name.trim().isEmpty ? site.host.trim() : site.name.trim();
+  final words = label
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+  if (words.isEmpty) {
+    return '?';
+  }
+  if (words.length == 1) {
+    return String.fromCharCodes(words.single.runes.take(2)).toUpperCase();
+  }
+  return '${String.fromCharCode(words.first.runes.first)}'
+          '${String.fromCharCode(words.last.runes.first)}'
+      .toUpperCase();
 }
 
 class _Metric extends StatelessWidget {

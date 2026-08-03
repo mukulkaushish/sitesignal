@@ -38,7 +38,7 @@ class MainActivity : FlutterActivity() {
                         if (ringtone == null) {
                             result.success(false)
                         } else {
-                            notificationSoundPreview?.stop()
+                            stopNotificationSoundPreview()
                             notificationSoundPreview = ringtone
                             ringtone.play()
                             result.success(true)
@@ -51,14 +51,35 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                 }
+                "stopSystemNotificationSound" -> {
+                    try {
+                        stopNotificationSoundPreview()
+                        result.success(true)
+                    } catch (_: Exception) {
+                        result.error(
+                            "system_sound_stop_failed",
+                            "The system notification sound could not be stopped.",
+                            null,
+                        )
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
     }
 
     override fun onDestroy() {
-        notificationSoundPreview?.stop()
-        notificationSoundPreview = null
+        try {
+            stopNotificationSoundPreview()
+        } catch (_: Exception) {
+            // The Activity is already shutting down; the reference is cleared.
+        }
         super.onDestroy()
+    }
+
+    private fun stopNotificationSoundPreview() {
+        val preview = notificationSoundPreview
+        notificationSoundPreview = null
+        preview?.stop()
     }
 }

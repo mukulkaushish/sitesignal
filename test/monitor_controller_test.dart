@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
+import 'package:site_signal/features/monitoring/domain/entities/favicon_image.dart';
 import 'package:site_signal/features/monitoring/domain/entities/notification_sound_preference.dart';
 import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/domain/repositories/monitor_repository.dart';
@@ -43,9 +45,7 @@ void main() {
         _result(HealthStatus.up, statusCode: 200),
       ],
     );
-    faviconResolver = FakeFaviconResolver(
-      result: Uri.parse('https://example.com/favicon.ico'),
-    );
+    faviconResolver = FakeFaviconResolver(result: _faviconImage());
     bridge = FakeDesktopBridge();
     controller = MonitorController(
       repository: repository,
@@ -213,54 +213,37 @@ void main() {
     ]);
   });
 
-  test('test notification plays the selected bundled sound itself', () async {
-    await controller.initialize();
-    await controller.setNotificationSoundPreference(
-      NotificationSoundPreference.beacon,
-    );
-
-    await controller.sendTestNotification();
-
-    expect(bridge.notifications, hasLength(1));
-    expect(
-      bridge.notifications.single.soundPreference,
-      NotificationSoundPreference.beacon,
-    );
-    expect(bridge.notifications.single.suppressSound, isTrue);
-    expect(bridge.soundPreviews, <NotificationSoundPreference>[
-      NotificationSoundPreference.beacon,
-    ]);
-  });
-
-  test('test notification previews the platform system sound', () async {
-    await controller.initialize();
-    await controller.setNotificationSoundPreference(
-      NotificationSoundPreference.system,
-    );
-
-    await controller.sendTestNotification();
-
-    expect(bridge.notifications.single.suppressSound, isTrue);
-    expect(bridge.soundPreviews, <NotificationSoundPreference>[
-      NotificationSoundPreference.system,
-    ]);
-  });
-
   test(
-    'test notification lets the OS sound when preview is unsupported',
+    'test notification delegates the selected bundled sound to OS',
     () async {
-      bridge.systemNotificationSoundPreviewSupported = false;
       await controller.initialize();
       await controller.setNotificationSoundPreference(
-        NotificationSoundPreference.system,
+        NotificationSoundPreference.beacon,
       );
 
       await controller.sendTestNotification();
 
+      expect(bridge.notifications, hasLength(1));
+      expect(
+        bridge.notifications.single.soundPreference,
+        NotificationSoundPreference.beacon,
+      );
       expect(bridge.notifications.single.suppressSound, isFalse);
       expect(bridge.soundPreviews, isEmpty);
     },
   );
+
+  test('test notification delegates the system sound to its channel', () async {
+    await controller.initialize();
+    await controller.setNotificationSoundPreference(
+      NotificationSoundPreference.system,
+    );
+
+    await controller.sendTestNotification();
+
+    expect(bridge.notifications.single.suppressSound, isFalse);
+    expect(bridge.soundPreviews, isEmpty);
+  });
 
   test('coalesces rapid test notification requests', () async {
     await controller.initialize();
@@ -584,18 +567,126 @@ void main() {
     );
   });
 
-  test('resolved favicon is attached and persisted', () async {
+  test('resolved favicon stays in memory only', () async {
     await controller.initialize();
-    await Future<void>.delayed(Duration.zero);
+    await pumpEventQueue();
 
+    expect(controller.faviconForSite('site-1'), same(faviconResolver.result));
+    expect(controller.sites.single.faviconUrl, isNull);
+    expect(repository.state.sites.single.faviconUrl, isNull);
     expect(
-      controller.sites.single.faviconUrl,
-      'https://example.com/favicon.ico',
+      bridge.menuUpdates.expand((update) => update.sites),
+      everyElement(predicate<SiteMonitor>((site) => site.faviconUrl == null)),
     );
+  });
+
+  test('legacy remote favicon is cleared and re-resolved in memory', () async {
+    final localRepository = MemoryMonitorRepository(
+      paused: true,
+      sites: <SiteMonitor>[
+        _unknownSite().copyWith(faviconUrl: 'https://example.com/favicon.ico'),
+      ],
+    );
+    final localResolver = FakeFaviconResolver(result: _faviconImage());
+    final localController = MonitorController(
+      repository: localRepository,
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: localResolver,
+      desktopBridge: FakeDesktopBridge(),
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(localController.dispose);
+
+    await localController.initialize();
+    await pumpEventQueue();
+
+    expect(localResolver.requestedOrigins, <Uri>[
+      Uri.parse('https://example.com'),
+    ]);
     expect(
-      repository.state.sites.single.faviconUrl,
-      'https://example.com/favicon.ico',
+      localController.faviconForSite('site-1'),
+      same(localResolver.result),
     );
+    expect(localController.sites.single.faviconUrl, isNull);
+    expect(localRepository.state.sites.single.faviconUrl, isNull);
+    expect(localRepository.fullSaveCount, 1);
+  });
+
+  test('sanitized legacy favicon persists when re-resolution fails', () async {
+    final localRepository = MemoryMonitorRepository(
+      paused: true,
+      sites: <SiteMonitor>[
+        _unknownSite().copyWith(faviconUrl: 'https://example.com/favicon.ico'),
+      ],
+    );
+    final localResolver = FakeFaviconResolver();
+    final localBridge = FakeDesktopBridge();
+    final localBackground = FakeBackgroundMonitor();
+    final localController = MonitorController(
+      repository: localRepository,
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: localResolver,
+      desktopBridge: localBridge,
+      backgroundMonitor: localBackground,
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(localController.dispose);
+
+    await localController.initialize();
+    await pumpEventQueue();
+
+    expect(localResolver.requestedOrigins, <Uri>[
+      Uri.parse('https://example.com'),
+    ]);
+    expect(localController.sites.single.faviconUrl, isNull);
+    expect(localRepository.state.sites.single.faviconUrl, isNull);
+    expect(localRepository.fullSaveCount, 1);
+    expect(localBridge.menuUpdates, isNotEmpty);
+    expect(
+      localBridge.menuUpdates
+          .expand((update) => update.sites)
+          .map((site) => site.faviconUrl),
+      everyElement(isNull),
+    );
+    expect(localBackground.synchronizedSnapshots, isNotEmpty);
+    expect(
+      localBackground.synchronizedSnapshots
+          .expand((snapshot) => snapshot.sites)
+          .map((site) => site.faviconUrl),
+      everyElement(isNull),
+    );
+  });
+
+  test('legacy data favicon is also cleared before resolution', () async {
+    final localRepository = MemoryMonitorRepository(
+      paused: true,
+      sites: <SiteMonitor>[
+        _unknownSite().copyWith(faviconUrl: 'data:image/png;base64,legacy'),
+      ],
+    );
+    final localResolver = FakeFaviconResolver(result: _faviconImage());
+    final localController = MonitorController(
+      repository: localRepository,
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: localResolver,
+      desktopBridge: FakeDesktopBridge(),
+      schedulerInterval: const Duration(days: 1),
+    );
+    addTearDown(localController.dispose);
+
+    await localController.initialize();
+    await pumpEventQueue();
+
+    expect(localResolver.requestedOrigins, <Uri>[
+      Uri.parse('https://example.com'),
+    ]);
+    expect(
+      localController.faviconForSite('site-1'),
+      same(localResolver.result),
+    );
+    expect(localController.sites.single.faviconUrl, isNull);
+    expect(localRepository.state.sites.single.faviconUrl, isNull);
+    expect(localRepository.fullSaveCount, 1);
   });
 
   test('restores history in memory when clearing cannot be saved', () async {
@@ -663,6 +754,13 @@ HealthCheckResult _result(
 }
 
 var _resultSequence = 0;
+
+FaviconImage _faviconImage() => FaviconImage.fromPngBytes(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8A'
+    'AQUBAScY42YAAAAASUVORK5CYII=',
+  ),
+);
 
 class _CompleterHealthChecker implements HealthChecker {
   final Completer<void> started = Completer<void>();

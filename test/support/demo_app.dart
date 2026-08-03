@@ -6,6 +6,7 @@ import 'fakes.dart';
 
 Future<MonitorController> createDemoMonitorController({
   AppThemePreference themePreference = AppThemePreference.light,
+  FakeDesktopBridge? desktopBridge,
 }) async {
   final controller = MonitorController(
     repository: MemoryMonitorRepository(
@@ -14,7 +15,7 @@ Future<MonitorController> createDemoMonitorController({
     ),
     healthChecker: ScriptedHealthChecker(),
     faviconResolver: FakeFaviconResolver(),
-    desktopBridge: FakeDesktopBridge(),
+    desktopBridge: desktopBridge ?? FakeDesktopBridge(),
     backgroundMonitor: FakeBackgroundMonitor(),
     schedulerInterval: const Duration(days: 1),
   );

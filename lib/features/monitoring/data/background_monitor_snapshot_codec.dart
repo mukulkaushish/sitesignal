@@ -67,7 +67,6 @@ class BackgroundMonitorSnapshotCodec {
       'name': site.name,
       'baseUrl': site.baseUrl,
       'probeUrl': site.probeUrl,
-      'faviconUrl': site.faviconUrl,
       'intervalSeconds': site.intervalSeconds,
       'enabled': site.enabled,
       'status': site.status.name,
@@ -104,7 +103,9 @@ class BackgroundMonitorSnapshotCodec {
       name: json['name'] as String? ?? Uri.tryParse(baseUrl)?.host ?? baseUrl,
       baseUrl: baseUrl,
       probeUrl: json['probeUrl'] as String?,
-      faviconUrl: json['faviconUrl'] as String?,
+      // Older schema-v2 snapshots may contain this field. It is intentionally
+      // ignored so favicon URLs or payloads never cross the isolate boundary.
+      faviconUrl: null,
       intervalSeconds: MonitoringPolicy.normalizeIntervalSeconds(
         (json['intervalSeconds'] as num?)?.toInt() ??
             MonitoringPolicy.defaultIntervalSeconds,

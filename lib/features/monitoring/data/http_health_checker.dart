@@ -25,6 +25,7 @@ class HttpHealthChecker implements HealthChecker {
   static const List<String> automaticProbePaths = <String>[
     '/health',
     '/healthz',
+    '/livez',
     '/readyz',
     '/api/health',
     '/actuator/health',

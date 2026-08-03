@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:site_signal/core/theme/app_accent_color.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
+import 'package:site_signal/features/monitoring/domain/entities/favicon_image.dart';
 import 'package:site_signal/features/monitoring/domain/entities/notification_sound_preference.dart';
 import 'package:site_signal/features/monitoring/domain/entities/site_monitor.dart';
 import 'package:site_signal/features/monitoring/domain/repositories/monitor_repository.dart';
@@ -118,16 +119,17 @@ ConnectivityAssessment _onlineAssessment() => ConnectivityAssessment(
 );
 
 class FakeFaviconResolver implements FaviconResolver {
-  FakeFaviconResolver({this.result});
+  FakeFaviconResolver({this.result, this.onResolve});
 
-  final Uri? result;
+  final FaviconImage? result;
+  Future<FaviconImage?> Function(Uri baseUri)? onResolve;
   final List<Uri> requestedOrigins = <Uri>[];
   bool closed = false;
 
   @override
-  Future<Uri?> resolve(Uri baseUri) async {
+  Future<FaviconImage?> resolve(Uri baseUri) async {
     requestedOrigins.add(baseUri);
-    return result;
+    return onResolve?.call(baseUri) ?? result;
   }
 
   @override
@@ -153,12 +155,7 @@ class FakeDesktopBridge implements DesktopBridge {
   bool launchAtStartupSupported = true;
   bool launchAtStartup = false;
   int launchAtStartupUpdateCount = 0;
-  bool systemNotificationSoundPreviewSupported = true;
   bool disposed = false;
-
-  @override
-  bool get supportsSystemNotificationSoundPreview =>
-      systemNotificationSoundPreviewSupported;
 
   @override
   Future<void> initialize({
@@ -257,6 +254,8 @@ class FakeBackgroundMonitor implements BackgroundMonitor {
   @override
   final bool ownsAutomaticChecks;
   BackgroundSnapshotCallback? onSnapshot;
+  final List<BackgroundMonitorSnapshot> synchronizedSnapshots =
+      <BackgroundMonitorSnapshot>[];
   int synchronizationCount = 0;
   bool disposed = false;
 
@@ -282,6 +281,7 @@ class FakeBackgroundMonitor implements BackgroundMonitor {
     BackgroundMonitorSnapshot snapshot,
   ) async {
     synchronizationCount += 1;
+    synchronizedSnapshots.add(snapshot);
     return BackgroundMonitoringStatus(
       mode: mode,
       isRunning: ownsAutomaticChecks,

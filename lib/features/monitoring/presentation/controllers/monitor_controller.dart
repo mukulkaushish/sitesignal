@@ -5,6 +5,7 @@ import 'package:site_signal/core/async/async_pool.dart';
 import 'package:site_signal/core/async/serial_task_queue.dart';
 import 'package:site_signal/core/theme/app_accent_color.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
+import 'package:site_signal/features/monitoring/domain/entities/favicon_image.dart';
 import 'package:site_signal/features/monitoring/domain/entities/incident_notification.dart';
 import 'package:site_signal/features/monitoring/domain/entities/incident_notification_key.dart';
 import 'package:site_signal/features/monitoring/domain/entities/monitor_fleet_summary.dart';
@@ -58,6 +59,7 @@ class MonitorController extends ChangeNotifier {
   final Set<String> _checkingIds = <String>{};
   final Set<Future<void>> _activeChecks = <Future<void>>{};
   final Set<String> _resolvingFaviconIds = <String>{};
+  final Map<String, FaviconImage> _faviconImages = <String, FaviconImage>{};
   List<SiteMonitor> _sites;
   Timer? _scheduler;
   Timer? _connectivityDebounce;
@@ -117,6 +119,8 @@ class MonitorController extends ChangeNotifier {
   bool get isCheckingAny => _checkingIds.isNotEmpty;
 
   bool isChecking(String id) => _checkingIds.contains(id);
+
+  FaviconImage? faviconForSite(String id) => _faviconImages[id];
 
   Future<void> initialize() {
     if (_initialized || _disposed) {
@@ -184,6 +188,7 @@ class MonitorController extends ChangeNotifier {
     if (_disposed) {
       return;
     }
+    final sanitizedPersistedFavicons = _sanitizePersistedFavicons();
 
     try {
       await backgroundMonitor.initialize(
@@ -205,6 +210,12 @@ class MonitorController extends ChangeNotifier {
     }
     if (_disposed) {
       return;
+    }
+    if (sanitizedPersistedFavicons) {
+      await _persistWithoutBackgroundSync();
+      if (_disposed) {
+        return;
+      }
     }
 
     try {
@@ -400,6 +411,9 @@ class MonitorController extends ChangeNotifier {
     );
 
     _replaceAt(index, updated);
+    if (urlChanged) {
+      _faviconImages.remove(id);
+    }
     _configurationEpoch += 1;
     _notifyAndSyncMenu();
     await _persist();
@@ -417,6 +431,7 @@ class MonitorController extends ChangeNotifier {
     );
     _configurationEpoch += 1;
     _checkingIds.remove(id);
+    _faviconImages.remove(id);
     _notifyAndSyncMenu();
     await _persist();
   }
@@ -434,7 +449,7 @@ class MonitorController extends ChangeNotifier {
     if (enabled && !_paused) {
       unawaited(checkSite(id));
     }
-    if (enabled && _sites[index].faviconUrl == null) {
+    if (enabled && !_faviconImages.containsKey(id)) {
       unawaited(_resolveFavicon(id));
     }
   }
@@ -715,13 +730,13 @@ class MonitorController extends ChangeNotifier {
       return;
     }
     final originalIndex = _sites.indexWhere((site) => site.id == id);
-    if (originalIndex == -1 || _sites[originalIndex].faviconUrl != null) {
+    if (originalIndex == -1 || _faviconImages.containsKey(id)) {
       return;
     }
 
     final original = _sites[originalIndex];
     _resolvingFaviconIds.add(id);
-    Uri? favicon;
+    FaviconImage? favicon;
     try {
       favicon = await faviconResolver.resolve(Uri.parse(original.baseUrl));
     } on Object {
@@ -734,7 +749,7 @@ class MonitorController extends ChangeNotifier {
     }
 
     final currentIndex = _sites.indexWhere((site) => site.id == id);
-    if (currentIndex == -1 || _sites[currentIndex].faviconUrl != null) {
+    if (currentIndex == -1 || _faviconImages.containsKey(id)) {
       return;
     }
     if (_sites[currentIndex].baseUrl != original.baseUrl) {
@@ -744,33 +759,41 @@ class MonitorController extends ChangeNotifier {
     if (favicon == null) {
       return;
     }
-    _replaceAt(
-      currentIndex,
-      _sites[currentIndex].copyWith(faviconUrl: favicon.toString()),
-    );
-    _notifyAndSyncMenu();
-    await _persist();
+    _faviconImages[id] = favicon;
+    _notifySafely();
   }
 
   Future<void> _resolveMissingFavicons() async {
     final ids = _sites
-        .where((site) => site.faviconUrl == null)
+        .where((site) => !_faviconImages.containsKey(site.id))
         .map((site) => site.id)
         .toList(growable: false);
     await mapConcurrent<String, void>(ids, _resolveFavicon, maxConcurrent: 3);
   }
 
-  Future<void> invalidateFavicon(String id, String failedUrl) async {
-    if (_disposed) {
+  bool _sanitizePersistedFavicons() {
+    var changed = false;
+    final sanitized = _sites
+        .map((site) {
+          if (site.faviconUrl == null) {
+            return site;
+          }
+          changed = true;
+          return site.copyWith(clearFaviconUrl: true);
+        })
+        .toList(growable: false);
+    if (changed) {
+      _sites = List<SiteMonitor>.unmodifiable(sanitized);
+    }
+    return changed;
+  }
+
+  void invalidateFavicon(String id, FaviconImage failedImage) {
+    if (_disposed || !identical(_faviconImages[id], failedImage)) {
       return;
     }
-    final index = _sites.indexWhere((site) => site.id == id);
-    if (index == -1 || _sites[index].faviconUrl != failedUrl) {
-      return;
-    }
-    _replaceAt(index, _sites[index].copyWith(clearFaviconUrl: true));
-    _notifyAndSyncMenu();
-    await _persist();
+    _faviconImages.remove(id);
+    _notifySafely();
   }
 
   Future<void> requestNotifications() async {
@@ -798,23 +821,13 @@ class MonitorController extends ChangeNotifier {
     _sendingTestNotification = true;
     _notifySafely();
     final soundPreference = _notificationSoundPreference;
-    final usesInAppPreview =
-        soundPreference.profile.fileName != null ||
-        (soundPreference == NotificationSoundPreference.system &&
-            desktopBridge.supportsSystemNotificationSoundPreview);
     try {
       await desktopBridge.showNotification(
         notificationKey: IncidentNotificationKey.test,
         title: '🔔 Test alert',
         body: 'Sound and notifications are ready',
         soundPreference: soundPreference,
-        suppressSound: usesInAppPreview,
       );
-      if (usesInAppPreview &&
-          !_disposed &&
-          _notificationSoundPreference == soundPreference) {
-        await desktopBridge.playNotificationSoundPreview(soundPreference);
-      }
       _errorMessage = null;
     } on Object catch (error) {
       _errorMessage = 'Could not send a test notification: $error';
@@ -1070,17 +1083,26 @@ class MonitorController extends ChangeNotifier {
   }
 
   Future<void> _persist({bool propagateError = false}) {
-    final persistedState = PersistedMonitorState(
-      sites: List<SiteMonitor>.unmodifiable(_sites),
+    final persistedState = _currentPersistedState();
+    return _queuePersistence(() async {
+      await repository.save(persistedState);
+      await _synchronizeBackgroundMonitoring();
+    }, propagateError: propagateError);
+  }
+
+  Future<void> _persistWithoutBackgroundSync() {
+    final persistedState = _currentPersistedState();
+    return _queuePersistence(() => repository.save(persistedState));
+  }
+
+  PersistedMonitorState _currentPersistedState() {
+    return PersistedMonitorState(
+      sites: _sitesWithoutFavicons(),
       paused: _paused,
       themePreference: _themePreference,
       primaryColorValue: _primaryColorValue,
       notificationSoundPreference: _notificationSoundPreference,
     );
-    return _queuePersistence(() async {
-      await repository.save(persistedState);
-      await _synchronizeBackgroundMonitoring();
-    }, propagateError: propagateError);
   }
 
   Future<void> _persistPreferences({required bool synchronizeBackground}) {
@@ -1116,7 +1138,7 @@ class MonitorController extends ChangeNotifier {
 
   BackgroundMonitorSnapshot _backgroundSnapshot() {
     return BackgroundMonitorSnapshot(
-      sites: List<SiteMonitor>.unmodifiable(_sites),
+      sites: _sitesWithoutFavicons(),
       paused: _paused,
       notificationSoundPreference: _notificationSoundPreference,
       updatedAt: DateTime.now().toUtc(),
@@ -1231,7 +1253,7 @@ class MonitorController extends ChangeNotifier {
 
   void _notifyAndSyncMenu() {
     _notifySafely();
-    final sites = List<SiteMonitor>.unmodifiable(_sites);
+    final sites = _sitesWithoutFavicons();
     final paused = _paused;
     unawaited(
       _menuUpdateQueue.schedule(
@@ -1252,12 +1274,23 @@ class MonitorController extends ChangeNotifier {
     }
   }
 
+  List<SiteMonitor> _sitesWithoutFavicons() {
+    return List<SiteMonitor>.unmodifiable(
+      _sites.map(
+        (site) => site.faviconUrl == null
+            ? site
+            : site.copyWith(clearFaviconUrl: true),
+      ),
+    );
+  }
+
   Future<void> shutdown() {
     final existing = _shutdownOperation;
     if (existing != null) {
       return existing;
     }
     _disposed = true;
+    _faviconImages.clear();
     _scheduler?.cancel();
     _connectivityDebounce?.cancel();
     final connectivityCancellation =

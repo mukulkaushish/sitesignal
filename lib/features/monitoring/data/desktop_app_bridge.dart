@@ -18,9 +18,85 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
+abstract interface class NotificationSoundPreviewPlayer {
+  Future<void> playAsset(String fileName);
+
+  Future<void> stop();
+
+  Future<void> dispose();
+}
+
+abstract final class AndroidNotificationSoundConfiguration {
+  static const _description = 'Outage and recovery alerts for monitored sites';
+
+  static AndroidNotificationChannel channel(
+    NotificationSoundPreference preference,
+  ) {
+    final profile = preference.profile;
+    final playSound = preference.playsSound;
+    return AndroidNotificationChannel(
+      profile.androidChannelId,
+      profile.androidChannelName,
+      description: _description,
+      importance: Importance.high,
+      playSound: playSound,
+      sound: profile.resourceName == null
+          ? null
+          : RawResourceAndroidNotificationSound(profile.resourceName),
+      enableVibration: playSound,
+      showBadge: true,
+    );
+  }
+
+  static AndroidNotificationDetails details({
+    required NotificationSoundPreference preference,
+    required bool suppressSound,
+    required int number,
+  }) {
+    final playSound = preference.playsSound && !suppressSound;
+    final profile = suppressSound
+        ? NotificationSoundPreference.silent.profile
+        : preference.profile;
+    return AndroidNotificationDetails(
+      profile.androidChannelId,
+      profile.androidChannelName,
+      channelDescription: _description,
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.status,
+      icon: 'ic_notification',
+      playSound: playSound,
+      sound: !playSound || profile.resourceName == null
+          ? null
+          : RawResourceAndroidNotificationSound(profile.resourceName),
+      enableVibration: playSound,
+      silent: !playSound,
+      number: number,
+    );
+  }
+}
+
 class DesktopAppBridge
     with TrayListener, WindowListener
     implements DesktopBridge {
+  factory DesktopAppBridge({
+    NotificationSoundPreviewPlayer Function()? soundPreviewPlayerFactory,
+    Future<bool> Function()? systemNotificationSoundPlayer,
+    Future<void> Function()? systemNotificationSoundStopper,
+  }) {
+    return DesktopAppBridge._(
+      soundPreviewPlayerFactory ?? _AudioNotificationSoundPlayer.new,
+      systemNotificationSoundPlayer,
+      systemNotificationSoundStopper,
+    );
+  }
+
+  DesktopAppBridge._(
+    this._soundPreviewPlayerFactory,
+    this._systemNotificationSoundPlayer,
+    this._systemNotificationSoundStopper,
+  );
+
   static const _neutralIcon = 'assets/tray_icon.png';
   static const _healthyIcon = 'assets/tray_icon_up.png';
   static const _downIcon = 'assets/tray_icon_down.png';
@@ -32,6 +108,9 @@ class DesktopAppBridge
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+  final NotificationSoundPreviewPlayer Function() _soundPreviewPlayerFactory;
+  final Future<bool> Function()? _systemNotificationSoundPlayer;
+  final Future<void> Function()? _systemNotificationSoundStopper;
 
   Future<void> Function()? _onCheckAll;
   Future<void> Function()? _onTogglePaused;
@@ -46,7 +125,7 @@ class DesktopAppBridge
   final Map<String, Future<void>> _notificationChains =
       <String, Future<void>>{};
   Future<NotificationPermission>? _permissionRequest;
-  AudioPlayer? _soundPreviewPlayer;
+  NotificationSoundPreviewPlayer? _soundPreviewPlayer;
   Future<void> _soundPreviewQueue = Future<void>.value();
   int _soundPreviewGeneration = 0;
 
@@ -57,14 +136,6 @@ class DesktopAppBridge
       !kIsWeb &&
       (Platform.isAndroid ||
           Platform.isIOS ||
-          Platform.isMacOS ||
-          Platform.isLinux ||
-          Platform.isWindows);
-
-  @override
-  bool get supportsSystemNotificationSoundPreview =>
-      !kIsWeb &&
-      (Platform.isAndroid ||
           Platform.isMacOS ||
           Platform.isLinux ||
           Platform.isWindows);
@@ -431,6 +502,10 @@ class DesktopAppBridge
       if (existingPlayer != null) {
         await existingPlayer.stop();
       }
+      await _stopSystemNotificationSound();
+      if (_quitting || generation != _soundPreviewGeneration) {
+        return;
+      }
       if (soundPreference == NotificationSoundPreference.system) {
         await _playSystemNotificationSound();
         return;
@@ -443,15 +518,19 @@ class DesktopAppBridge
         return;
       }
 
-      final player = existingPlayer ?? AudioPlayer();
+      final player = existingPlayer ?? _soundPreviewPlayerFactory();
       _soundPreviewPlayer = player;
-      await player.play(AssetSource(fileName));
+      await player.playAsset(fileName);
     }();
     _soundPreviewQueue = operation;
     return operation;
   }
 
   Future<void> _playSystemNotificationSound() async {
+    final injectedPlayer = _systemNotificationSoundPlayer;
+    if (injectedPlayer != null && await injectedPlayer()) {
+      return;
+    }
     if (Platform.isAndroid || Platform.isMacOS) {
       try {
         final played = await _desktopChannel.invokeMethod<bool>(
@@ -470,6 +549,22 @@ class DesktopAppBridge
       }
     }
     await SystemSound.play(SystemSoundType.alert);
+  }
+
+  Future<void> _stopSystemNotificationSound() async {
+    final injectedStopper = _systemNotificationSoundStopper;
+    if (injectedStopper != null) {
+      await injectedStopper();
+      return;
+    }
+    if (!Platform.isAndroid) {
+      return;
+    }
+    try {
+      await _desktopChannel.invokeMethod<bool>('stopSystemNotificationSound');
+    } on MissingPluginException {
+      // A bundled sound can still be previewed by an older native runner.
+    }
   }
 
   @override
@@ -521,9 +616,6 @@ class DesktopAppBridge
     final notificationId = _notificationIdForKey(notificationKey);
     final soundProfile = soundPreference.profile;
     final playSound = soundPreference.playsSound && !suppressSound;
-    final androidProfile = suppressSound
-        ? NotificationSoundPreference.silent.profile
-        : soundProfile;
 
     // Removing only this stable slot makes the next show a fresh alert while
     // preserving the latest notifications for every other monitored site.
@@ -545,22 +637,9 @@ class DesktopAppBridge
       body: body,
       payload: 'open-dashboard',
       notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          androidProfile.androidChannelId,
-          androidProfile.androidChannelName,
-          channelDescription: 'Outage and recovery alerts for monitored sites',
-          importance: Importance.high,
-          priority: Priority.high,
-          category: AndroidNotificationCategory.status,
-          icon: 'ic_notification',
-          playSound: playSound,
-          sound: !playSound || androidProfile.resourceName == null
-              ? null
-              : RawResourceAndroidNotificationSound(
-                  androidProfile.resourceName,
-                ),
-          enableVibration: playSound,
-          silent: !playSound,
+        android: AndroidNotificationSoundConfiguration.details(
+          preference: soundPreference,
+          suppressSound: suppressSound,
           number: _downCount,
         ),
         iOS: darwinDetails,
@@ -641,21 +720,8 @@ class DesktopAppBridge
       return;
     }
     for (final preference in NotificationSoundPreference.values) {
-      final profile = preference.profile;
-      final playSound = preference.playsSound;
       await android.createNotificationChannel(
-        AndroidNotificationChannel(
-          profile.androidChannelId,
-          profile.androidChannelName,
-          description: 'Outage and recovery alerts for monitored sites',
-          importance: Importance.high,
-          playSound: playSound,
-          sound: profile.resourceName == null
-              ? null
-              : RawResourceAndroidNotificationSound(profile.resourceName),
-          enableVibration: playSound,
-          showBadge: true,
-        ),
+        AndroidNotificationSoundConfiguration.channel(preference),
       );
     }
   }
@@ -866,6 +932,22 @@ class DesktopAppBridge
       windowManager.removeListener(this);
     }
   }
+}
+
+final class _AudioNotificationSoundPlayer
+    implements NotificationSoundPreviewPlayer {
+  final AudioPlayer _player = AudioPlayer();
+
+  @override
+  Future<void> playAsset(String fileName) {
+    return _player.play(AssetSource(fileName));
+  }
+
+  @override
+  Future<void> stop() => _player.stop();
+
+  @override
+  Future<void> dispose() => _player.dispose();
 }
 
 extension _PlatformNotificationSound on NotificationSoundPreference {

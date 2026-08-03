@@ -53,9 +53,10 @@ class _MonitorDialogState extends State<MonitorDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.site?.name ?? '');
     _urlController = TextEditingController(text: widget.site?.baseUrl ?? '');
-    _intervalSeconds = widget.site?.intervalSeconds ?? 60;
+    _intervalSeconds =
+        widget.site?.intervalSeconds ?? MonitoringPolicy.defaultIntervalSeconds;
     if (!_intervals.contains(_intervalSeconds)) {
-      _intervalSeconds = 60;
+      _intervalSeconds = MonitoringPolicy.defaultIntervalSeconds;
     }
   }
 

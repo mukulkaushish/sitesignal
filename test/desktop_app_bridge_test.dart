@@ -5,6 +5,8 @@ import 'package:site_signal/features/monitoring/data/desktop_app_bridge.dart';
 import 'package:site_signal/features/monitoring/domain/entities/notification_sound_preference.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'keeps one fresh notification per site without clearing other sites',
     () async {
@@ -63,6 +65,133 @@ void main() {
       expect(notifications.activeTitles[shopId], '🔴 Shop is down');
     },
   );
+
+  test('preview routing stops prior system and bundled players', () async {
+    final events = <String>[];
+    final player = _RecordingSoundPreviewPlayer(events);
+    var playerCreationCount = 0;
+    final bridge = DesktopAppBridge(
+      soundPreviewPlayerFactory: () {
+        playerCreationCount += 1;
+        return player;
+      },
+      systemNotificationSoundPlayer: () async {
+        events.add('system:play');
+        return true;
+      },
+      systemNotificationSoundStopper: () async {
+        events.add('system:stop');
+      },
+    );
+    addTearDown(bridge.dispose);
+
+    await bridge.playNotificationSoundPreview(
+      NotificationSoundPreference.system,
+    );
+    await bridge.playNotificationSoundPreview(
+      NotificationSoundPreference.brightChime,
+    );
+    await bridge.playNotificationSoundPreview(
+      NotificationSoundPreference.beacon,
+    );
+    await bridge.playNotificationSoundPreview(
+      NotificationSoundPreference.silent,
+    );
+
+    expect(playerCreationCount, 1);
+    expect(events, <String>[
+      'system:stop',
+      'system:play',
+      'system:stop',
+      'asset:site_signal_bright_chime.wav',
+      'asset:stop',
+      'system:stop',
+      'asset:site_signal_beacon.wav',
+      'asset:stop',
+      'system:stop',
+    ]);
+  });
+
+  test('maps selected sounds to Android channel and alert details', () {
+    final customChannel = AndroidNotificationSoundConfiguration.channel(
+      NotificationSoundPreference.brightChime,
+    );
+    final customDetails = AndroidNotificationSoundConfiguration.details(
+      preference: NotificationSoundPreference.brightChime,
+      suppressSound: false,
+      number: 2,
+    );
+
+    expect(customChannel.id, endsWith('_v4'));
+    expect(customChannel.playSound, isTrue);
+    expect(customChannel.enableVibration, isTrue);
+    expect(customChannel.sound, isA<RawResourceAndroidNotificationSound>());
+    expect(customChannel.sound?.sound, 'site_signal_bright_chime');
+    expect(customDetails.channelId, customChannel.id);
+    expect(customDetails.playSound, isTrue);
+    expect(customDetails.silent, isFalse);
+    expect(customDetails.sound?.sound, 'site_signal_bright_chime');
+    expect(
+      customDetails.channelAction,
+      AndroidNotificationChannelAction.createIfNotExists,
+    );
+
+    final systemChannel = AndroidNotificationSoundConfiguration.channel(
+      NotificationSoundPreference.system,
+    );
+    final systemDetails = AndroidNotificationSoundConfiguration.details(
+      preference: NotificationSoundPreference.system,
+      suppressSound: false,
+      number: 0,
+    );
+
+    expect(systemChannel.playSound, isTrue);
+    expect(systemChannel.sound, isNull);
+    expect(systemDetails.playSound, isTrue);
+    expect(systemDetails.sound, isNull);
+    expect(systemDetails.silent, isFalse);
+
+    final silentChannel = AndroidNotificationSoundConfiguration.channel(
+      NotificationSoundPreference.silent,
+    );
+    final suppressedCustom = AndroidNotificationSoundConfiguration.details(
+      preference: NotificationSoundPreference.beacon,
+      suppressSound: true,
+      number: 0,
+    );
+
+    expect(silentChannel.playSound, isFalse);
+    expect(silentChannel.sound, isNull);
+    expect(silentChannel.enableVibration, isFalse);
+    expect(
+      suppressedCustom.channelId,
+      NotificationSoundPreference.silent.profile.androidChannelId,
+    );
+    expect(suppressedCustom.playSound, isFalse);
+    expect(suppressedCustom.sound, isNull);
+    expect(suppressedCustom.silent, isTrue);
+  });
+}
+
+class _RecordingSoundPreviewPlayer implements NotificationSoundPreviewPlayer {
+  _RecordingSoundPreviewPlayer(this.events);
+
+  final List<String> events;
+
+  @override
+  Future<void> dispose() async {
+    events.add('asset:dispose');
+  }
+
+  @override
+  Future<void> playAsset(String fileName) async {
+    events.add('asset:$fileName');
+  }
+
+  @override
+  Future<void> stop() async {
+    events.add('asset:stop');
+  }
 }
 
 class _RecordingNotificationsPlatform

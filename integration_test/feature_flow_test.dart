@@ -3,18 +3,27 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:site_signal/app/site_signal_app.dart';
+import 'package:site_signal/features/monitoring/domain/entities/notification_sound_preference.dart';
 
 import '../test/support/demo_app.dart';
+import '../test/support/fakes.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('exercises the complete responsive feature set', (tester) async {
-    final controller = await createDemoMonitorController();
+    final bridge = FakeDesktopBridge();
+    final controller = await createDemoMonitorController(desktopBridge: bridge);
     await tester.pumpWidget(
       SiteSignalApp(controller: controller, applicationVersion: '1.0.0'),
     );
     await tester.pumpAndSettle();
+
+    expect(find.text('Production API'), findsOneWidget);
+    expect(
+      controller.sites.map((site) => site.name),
+      containsAll(<String>['Production API', 'Storefront']),
+    );
 
     debugPrint('FEATURE_FLOW_READY');
     await _hold(tester, const Duration(seconds: 3));
@@ -22,6 +31,7 @@ void main() {
     // Add a sanitized example monitor and show interval selection.
     await tester.tap(find.byTooltip('Add website'));
     await tester.pumpAndSettle();
+    expect(find.text('Add a website'), findsOneWidget);
     await _hold(tester);
     await tester.enterText(find.byType(TextFormField).first, 'Status page');
     await tester.enterText(
@@ -37,6 +47,7 @@ void main() {
     await tester.ensureVisible(saveMonitor);
     await tester.tap(saveMonitor);
     await tester.pumpAndSettle();
+    expect(controller.sites.any((site) => site.name == 'Status page'), isTrue);
     await _hold(tester, const Duration(seconds: 2));
 
     // Demonstrate per-site disable, enable, and edit controls.
@@ -44,14 +55,17 @@ void main() {
     await _hold(tester);
     await tester.tap(find.text('Disable').last);
     await tester.pumpAndSettle();
+    expect(controller.sites.first.enabled, isFalse);
     await _hold(tester);
     await _openFirstMonitorMenu(tester);
     await tester.tap(find.text('Enable').last);
     await tester.pumpAndSettle();
+    expect(controller.sites.first.enabled, isTrue);
     await _hold(tester);
     await _openFirstMonitorMenu(tester);
     await tester.tap(find.text('Edit').last);
     await tester.pumpAndSettle();
+    expect(find.text('Edit monitor'), findsOneWidget);
     await _dismissKeyboard(tester);
     await _hold(tester, const Duration(seconds: 2));
     Navigator.of(tester.element(find.text('Edit monitor'))).pop();
@@ -59,6 +73,7 @@ void main() {
     await _openFirstMonitorMenu(tester);
     await tester.tap(find.text('Remove').last);
     await tester.pumpAndSettle();
+    expect(find.text('Remove monitor?'), findsOneWidget);
     await _hold(tester);
     Navigator.of(tester.element(find.text('Remove monitor?'))).pop();
     await tester.pumpAndSettle();
@@ -69,6 +84,8 @@ void main() {
     // Browse transition history, website filtering, date ranges, and clearing.
     await tester.tap(find.text('History').last);
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('history-site-filter')), findsOneWidget);
+    expect(find.byKey(const ValueKey('history-range-filter')), findsOneWidget);
     await _hold(tester, const Duration(seconds: 2));
     await tester.tap(find.byKey(const ValueKey('history-site-filter')));
     await tester.pumpAndSettle();
@@ -83,6 +100,7 @@ void main() {
     await _hold(tester);
     await tester.tap(find.text('Clear history').last);
     await tester.pumpAndSettle();
+    expect(find.text('Clear all history?'), findsOneWidget);
     await _hold(tester);
     Navigator.of(tester.element(find.text('Clear all history?'))).pop();
     await tester.pumpAndSettle();
@@ -90,6 +108,7 @@ void main() {
     // Show theme, accent, monitoring, sounds, test alerts, and device behavior.
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
+    expect(find.text('Automatic monitoring'), findsOneWidget);
     await _hold(tester, const Duration(seconds: 2));
     await tester.tap(find.text('Dark').last);
     await tester.pumpAndSettle();
@@ -123,6 +142,10 @@ void main() {
     await _hold(tester);
     await tester.tap(find.text('Bright chime').last);
     await tester.pumpAndSettle();
+    expect(
+      controller.notificationSoundPreference,
+      NotificationSoundPreference.brightChime,
+    );
     await _hold(tester, const Duration(seconds: 2));
 
     await tester.tap(soundControl);
@@ -131,12 +154,25 @@ void main() {
     await tester.ensureVisible(systemDefault);
     await tester.tap(systemDefault);
     await tester.pumpAndSettle();
+    expect(
+      controller.notificationSoundPreference,
+      NotificationSoundPreference.system,
+    );
     await _hold(tester);
     final sendTest = find.text('Send test').last;
     await tester.ensureVisible(sendTest);
     await tester.pumpAndSettle();
+    final previewCountBeforeTest = bridge.soundPreviews.length;
     await tester.tap(sendTest);
     await tester.pumpAndSettle();
+    // This fake-backed walkthrough verifies Dart routing only; it does not
+    // verify operating-system audio output.
+    expect(
+      bridge.notifications.last.soundPreference,
+      NotificationSoundPreference.system,
+    );
+    expect(bridge.notifications.last.suppressSound, isFalse);
+    expect(bridge.soundPreviews, hasLength(previewCountBeforeTest));
     await _hold(tester);
 
     await tester.scrollUntilVisible(
@@ -148,6 +184,7 @@ void main() {
 
     await tester.tap(find.text('Overview').last);
     await tester.pumpAndSettle();
+    expect(find.text('Production API'), findsOneWidget);
     await _hold(tester, const Duration(seconds: 3));
     debugPrint('FEATURE_FLOW_COMPLETE');
   });

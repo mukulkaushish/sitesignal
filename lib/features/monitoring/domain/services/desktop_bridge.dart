@@ -29,8 +29,6 @@ abstract interface class DesktopBridge {
 
   Future<bool> setLaunchAtStartupEnabled(bool enabled);
 
-  bool get supportsSystemNotificationSoundPreview;
-
   Future<void> playNotificationSoundPreview(
     NotificationSoundPreference soundPreference,
   );
