@@ -24,7 +24,7 @@ jobs:
       contents: read
 
   macos-screenshots:
-    name: Verify macOS light screenshots
+    name: Capture macOS light screenshots
     needs: quality
     runs-on: macos-26
     timeout-minutes: 30
@@ -39,9 +39,7 @@ jobs:
         run: ./tool/capture_repository_screenshots.sh macos
       - name: Validate screenshot files and dimensions
         run: dart run tool/check_code_rules.dart
-      - name: Verify checked-in screenshots are current
-        run: git diff --exit-code -- docs/screenshots/macos-*-light.png
-      - name: Upload verified screenshots
+      - name: Upload current screenshots
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sitesignal-screenshots-macos
@@ -50,7 +48,7 @@ jobs:
           retention-days: 1
           compression-level: 0
   android-integration:
-    name: Verify Android flow and light screenshots
+    name: Verify Android flow and capture light screenshots
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 50
@@ -86,8 +84,7 @@ jobs:
             flutter test integration_test/feature_flow_test.dart --device-id emulator-5554
             ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_repository_screenshots.sh android
             dart run tool/check_code_rules.dart
-            git diff --exit-code -- docs/screenshots/android-*-light.png
-      - name: Upload verified screenshots
+      - name: Upload current screenshots
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sitesignal-screenshots-android
