@@ -1,159 +1,133 @@
-# SiteSignal
-
-<br>
+<h1 align="center">SiteSignal</h1>
 
 <p align="center">
-  <img src="assets/app_icon.png" width="160" height="160" alt="SiteSignal app icon">
-  <br>
-  <strong>Status:</strong> Active development
-  <br>
-  <strong>Version:</strong> 1.0.0
-  <br>
-  <a href="https://github.com/mukulkaushish/sitesignal/releases"><strong>Download</strong></a>
-  ·
-  <a href="https://github.com/mukulkaushish/sitesignal/actions">Builds</a>
-  ·
-  <a href="https://github.com/mukulkaushish/sitesignal/commits/main">Commits</a>
+  <a href="https://github.com/mukulkaushish/sitesignal">
+    <img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/assets/app_icon.png" width="152" height="152" alt="SiteSignal app icon">
+  </a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/mukulkaushish/sitesignal/actions/workflows/ci.yml"><img src="https://github.com/mukulkaushish/sitesignal/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-  <a href="https://github.com/mukulkaushish/sitesignal/actions/workflows/release.yml"><img src="https://github.com/mukulkaushish/sitesignal/actions/workflows/release.yml/badge.svg" alt="Release status"></a>
+  <strong>Know when your website goes down—and when it comes back.</strong>
+  <br>
+  A free, local-first website monitor for your own devices.
 </p>
 
-SiteSignal is a free website health monitor for your own devices. Add a website,
-choose how often to check it, and receive a native notification when it goes
-down or comes back online.
+<p align="center">
+  <a href="https://github.com/mukulkaushish/sitesignal/actions/workflows/ci.yml"><img src="https://github.com/mukulkaushish/sitesignal/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/mukulkaushish/sitesignal/releases/latest"><img src="https://img.shields.io/github/v/release/mukulkaushish/sitesignal?display_name=tag&sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/mukulkaushish/sitesignal/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mukulkaushish/sitesignal" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/Flutter-3.44.7-02569B?logo=flutter&logoColor=white" alt="Flutter 3.44.7">
+</p>
 
-> [!NOTE]
-> Your URLs, settings, and history stay on your device. SiteSignal has no
-> account, cloud server, analytics, advertising, or subscription.
+<p align="center">
+  <a href="https://github.com/mukulkaushish/sitesignal/releases/latest"><strong>Download the latest release</strong></a>
+  ·
+  <a href="https://github.com/mukulkaushish/sitesignal/issues">Report a problem</a>
+  ·
+  <a href="BUILD.md">Build it yourself</a>
+</p>
 
-### Table of Contents
-
-[Features](#features) · [Screenshots](#screenshots) ·
-[Platforms](#supported-platforms) · [Download](#getting-sitesignal) ·
-[Privacy](#privacy) · [Development](#development) · [License](#license)
-
-<br>
-
-## Features
-
-### Monitoring
-
-- **Multiple websites · Automatic checks · Manual checks · Health endpoint discovery**
-- Add a base URL and let SiteSignal try safe same-origin paths such as
-  `/health`, `/healthz`, `/readyz`, `/api/health`, and `/status`.
-- Choose a check interval from 15 seconds to 1 hour.
-- See response time, HTTP status, recorded uptime, and recent state changes.
-- Detect device internet problems without marking every website as down.
-
-### Notifications
-
-- Receive an alert only when a website changes state, which avoids repeat
-  notification spam.
-- Choose Classic bell, Bright chime, Soft pulse, Beacon, the system sound, or
-  silent notifications.
-- Hear an audible sound preview as soon as you select it.
-- Send a test notification with the currently selected sound.
-
-### App controls
-
-- Filter history by website and date range.
-- Pause, resume, edit, disable, or remove a monitor.
-- Use System, Light, or Dark appearance and choose an accent color.
-- Keep monitoring from the desktop tray or Android foreground service.
-- Store all configuration and transition history in a local SQLite database.
+SiteSignal checks the websites you choose and sends a native notification when
+their state changes. There is no account, cloud dashboard, analytics, advertising,
+or subscription. Your settings and history stay on your device.
 
 ## Screenshots
 
-The screenshots below are always visible, use light mode, and contain only safe
-`example.com` demo data. Click an image to open the full-resolution version.
+These light-mode screenshots use safe `example.com` demo data and are always
+visible. Select any image to open the original high-resolution file.
 
 ### macOS
 
-| Overview | History | Settings |
-| --- | --- | --- |
-| [![SiteSignal Overview on macOS](docs/screenshots/macos-overview-light.png)](docs/screenshots/macos-overview-light.png) | [![SiteSignal History on macOS](docs/screenshots/macos-history-light.png)](docs/screenshots/macos-history-light.png) | [![SiteSignal Settings on macOS](docs/screenshots/macos-settings-light.png)](docs/screenshots/macos-settings-light.png) |
+#### Overview
+
+<p align="center">
+  <a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/macos-overview-light.png">
+    <img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/macos-overview-light.png" width="900" alt="SiteSignal overview on macOS">
+  </a>
+</p>
+
+<table>
+  <tr>
+    <th width="50%">History</th>
+    <th width="50%">Settings</th>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/macos-history-light.png"><img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/macos-history-light.png" width="440" alt="SiteSignal history on macOS"></a></td>
+    <td><a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/macos-settings-light.png"><img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/macos-settings-light.png" width="440" alt="SiteSignal settings on macOS"></a></td>
+  </tr>
+</table>
 
 ### Android
 
-| Overview | History | Settings |
+<table>
+  <tr>
+    <th width="33%">Overview</th>
+    <th width="33%">History</th>
+    <th width="33%">Settings</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/android-overview-light.png"><img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/android-overview-light.png" width="260" alt="SiteSignal overview on Android"></a></td>
+    <td align="center"><a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/android-history-light.png"><img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/android-history-light.png" width="260" alt="SiteSignal history on Android"></a></td>
+    <td align="center"><a href="https://github.com/mukulkaushish/sitesignal/blob/main/docs/screenshots/android-settings-light.png"><img src="https://raw.githubusercontent.com/mukulkaushish/sitesignal/main/docs/screenshots/android-settings-light.png" width="260" alt="SiteSignal settings on Android"></a></td>
+  </tr>
+</table>
+
+## What it does
+
+- Monitors multiple HTTP or HTTPS websites on a schedule.
+- Discovers safe same-origin health endpoints such as `/health`, `/healthz`,
+  `/livez`, `/readyz`, `/api/health`, and `/status`.
+- Shows response time, HTTP status, uptime, and state-change history.
+- Avoids false outage records when the device itself has no internet access.
+- Sends alerts only for real changes: online to offline, or offline to online.
+- Offers four bundled notification sounds, the system sound, and silent mode.
+- Plays a sound preview when you select it and uses that choice for test alerts.
+- Keeps desktop monitoring in the system tray and Android monitoring in a visible
+  foreground service.
+- Stores configuration and a bounded history in a local SQLite database.
+
+## Downloads
+
+The [latest GitHub release](https://github.com/mukulkaushish/sitesignal/releases/latest)
+contains checksummed packages built by the repository workflow.
+
+| Platform | Architectures | Packages |
 | --- | --- | --- |
-| <a href="docs/screenshots/android-overview-light.png"><img src="docs/screenshots/android-overview-light.png" width="260" alt="SiteSignal Overview on Android"></a> | <a href="docs/screenshots/android-history-light.png"><img src="docs/screenshots/android-history-light.png" width="260" alt="SiteSignal History on Android"></a> | <a href="docs/screenshots/android-settings-light.png"><img src="docs/screenshots/android-settings-light.png" width="260" alt="SiteSignal Settings on Android"></a> |
+| Android | ARMv7, ARM64, x86_64 | APK |
+| macOS | ARM64, x86_64 | ZIP |
+| Linux | ARM64, x86_64 | `tar.gz` |
+| Windows | ARM64, x86_64 | ZIP and MSIX |
 
-Android screenshots are captured at 1080×2340 with the real status and
-navigation bars. macOS screenshots are captured at 2× resolution.
-
-## Supported platforms
-
-| Platform | App behavior | Distribution |
-| --- | --- | --- |
-| macOS | Desktop window, menu bar, native alerts | ARM64 and x86_64 ZIP |
-| Linux | Desktop window, system tray, native alerts | ARM64 and x86_64 archive |
-| Windows | Desktop window, system tray, native alerts | ARM64 and x86_64 ZIP/MSIX |
-| Android | Responsive app, foreground monitoring, native alerts | ARMv7, ARM64, and x86_64 APK |
-| iOS | Source kept for possible future work | Not built or published |
-
-> [!IMPORTANT]
-> SiteSignal currently builds and publishes macOS, Linux, Windows, and Android
-> only. The release pipeline does not create an iOS artifact.
-
-Desktop builds keep monitoring in the tray when the window closes. Android
-uses a visible foreground service because the operating system limits hidden
-background work.
-
-## Getting SiteSignal
-
-### GitHub Releases
-
-Published versions are available on the
-[Releases page](https://github.com/mukulkaushish/sitesignal/releases). Release
-files are currently unsigned, development signed, or ad-hoc signed, so your
-operating system may show a warning.
-
-### Free CI builds
-
-Every successful [CI run](https://github.com/mukulkaushish/sitesignal/actions/workflows/ci.yml)
-provides short-lived test artifacts:
-
-- macOS ARM64 ZIP
-- Android ARMv7, ARM64, and x86_64 APKs
-- Test coverage
-- The latest six-image screenshot collection
-
-Open a successful run and download the required file from its **Artifacts**
-section. See [BUILD.md](BUILD.md) for local release commands and platform
-requirements.
+The packages are unsigned, ad-hoc signed, or development signed. Your operating
+system may show an installation warning. See [BUILD.md](BUILD.md) for exact
+targets, verification, and local build commands.
 
 ## How it works
 
 1. Add a website and choose a check interval.
-2. SiteSignal checks the base address and safe same-origin health endpoints.
-3. A `200–299` response is healthy. Timeouts, connection errors, and other HTTP
-   responses are failures.
-4. The first result creates a baseline. Later state changes create an outage or
-   recovery notification.
-5. Configuration and transition history are saved locally.
+2. SiteSignal checks its base address and safe same-origin health paths.
+3. A `200–299` response is healthy. Other responses and connection failures are
+   unhealthy.
+4. The first result creates a baseline. Later state changes create a history
+   entry and notification.
+5. Everything is saved locally on the device.
 
-SiteSignal checks from one device and one network. It is useful for personal
-sites, side projects, homelabs, and internal tools. It is not a replacement for
+SiteSignal is useful for personal sites, side projects, homelabs, and internal
+tools. It checks from one device and one network, so it is not a replacement for
 multi-region monitoring or a public status page.
 
 ## Privacy
 
-> [!TIP]
-> SiteSignal does not send data to a SiteSignal server because no such server
-> exists. Network requests go only to websites you configure and to bounded
-> connectivity-check endpoints used to confirm internet access.
+SiteSignal has no hosted backend. It sends requests only to sites you configure,
+same-origin discovery resources, and small public connectivity endpoints used to
+tell a device outage from a website outage. It never sends your monitor list or
+history to a SiteSignal service.
 
-Do not put private URLs, credentials, signing keys, personal screenshots, or
-real monitoring data in issues or pull requests. Read [PRIVACY.md](PRIVACY.md)
-and [SECURITY.md](SECURITY.md) for details.
+Read [PRIVACY.md](PRIVACY.md) for the complete data-flow and retention details.
 
-## Development
+## Quick start
 
-Install Flutter `3.44.7` and the toolchain for your platform, then run:
+Install Flutter 3.44.7 and the native toolchain for your platform, then run:
 
 ```bash
 git clone https://github.com/mukulkaushish/sitesignal.git
@@ -162,7 +136,7 @@ flutter pub get
 flutter run
 ```
 
-Run the complete local checks with:
+Run the main checks with:
 
 ```bash
 dart format --output=none --set-exit-if-changed lib test integration_test tool
@@ -172,22 +146,17 @@ flutter analyze
 flutter test
 ```
 
-This public repository uses standard GitHub-hosted runners. CI checks the code,
-runs all tests, builds macOS ARM64 and Android packages, exercises the Android
-feature flow, and uploads fresh screenshots. The manual or tag-based release
-workflow builds Linux, macOS, Windows, and Android without creating an iOS
-artifact.
-
-For screenshot commands and the complete native release matrix, read
-[BUILD.md](BUILD.md).
+Device tests stay in `integration_test/`; unit and widget tests stay in `test/`.
+See [the architecture guide](docs/architecture.md), [BUILD.md](BUILD.md), and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md) before opening a pull request. Use only
-sanitized `example.com` data in screenshots, tests, logs, and issues.
+Issues and pull requests are welcome. Keep changes focused, add regression tests,
+and use only sanitized `example.com` data in screenshots, logs, and reports.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-SiteSignal is open source under the [MIT License](LICENSE). You may use,
-modify, and share it under the license terms.
+SiteSignal is open source under the [MIT License](LICENSE).

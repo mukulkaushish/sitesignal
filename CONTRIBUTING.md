@@ -13,7 +13,8 @@ documentation, accessibility, testing, and packaging.
 - Use the private process in [SECURITY.md](SECURITY.md) for vulnerabilities.
 
 Questions about expected platform behavior may already be answered in
-[README.md](README.md) or [BUILD.md](BUILD.md).
+[README.md](README.md), [BUILD.md](BUILD.md), or
+[docs/architecture.md](docs/architecture.md).
 
 ## Development setup
 
@@ -39,8 +40,10 @@ SiteSignal uses a feature-first, ports-and-adapters design:
 - `lib/features/monitoring/presentation` contains controller state and Flutter
   views.
 - `lib/core` contains shared async, theme, platform, text, and widget code.
-- `test` mirrors the production behavior with unit, adapter, controller, and
-  responsive widget coverage.
+- `test/` contains unit and widget tests.
+- `integration_test/` contains flows that run on a real device or emulator.
+- `tool/repository_screenshot_main.dart` is a private executable for reproducible
+  repository screenshots; it is not a test.
 
 ## Core correctness rules
 
@@ -76,14 +79,26 @@ Run all checks from the repository root:
 
 ```bash
 dart format --output=none --set-exit-if-changed lib test integration_test tool
+bash -n tool/*.sh
 dart run tool/check_code_rules.dart
 flutter analyze
-flutter test
+flutter test --coverage
 ```
 
 Use [BUILD.md](BUILD.md) for release commands and platform-specific smoke tests.
 Emulators do not reproduce every notification permission, sleep/resume path,
 desktop environment, or Android battery policy.
+
+Run the device flow on an active Android emulator when changing navigation,
+monitor management, or packaging:
+
+```bash
+flutter test integration_test/feature_flow_test.dart --device-id emulator-5554
+```
+
+The integration flow verifies the app interaction and notification request. It
+cannot hear native audio or confirm operating-system notification settings, so
+sound and delivery changes also need a real-device smoke test.
 
 For a visible change, regenerate the relevant native screenshots before opening
 a pull request:
