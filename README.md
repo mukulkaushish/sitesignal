@@ -76,7 +76,8 @@ visible. Select any image to open the original high-resolution file.
 
 - Monitors multiple HTTP or HTTPS websites on a schedule.
 - Discovers safe same-origin health endpoints such as `/health`, `/healthz`,
-  `/livez`, `/readyz`, `/api/health`, and `/status`.
+  `/livez`, `/readyz`, `/health/ready`, `/actuator/health`, `/q/health`, and
+  `/-/ready`.
 - Shows response time, HTTP status, uptime, and state-change history.
 - Avoids false outage records when the device itself has no internet access.
 - Sends alerts only for real changes: online to offline, or offline to online.
@@ -85,6 +86,8 @@ visible. Select any image to open the original high-resolution file.
 - Keeps desktop monitoring in the system tray and Android monitoring in a visible
   foreground service.
 - Stores configuration and a bounded history in a local SQLite database.
+- Checks the latest stable GitHub release and recommends an update without
+  downloading or installing anything silently.
 
 ## Downloads
 
@@ -120,7 +123,8 @@ multi-region monitoring or a public status page.
 
 SiteSignal has no hosted backend. It sends requests only to sites you configure,
 same-origin discovery resources, and small public connectivity endpoints used to
-tell a device outage from a website outage. It never sends your monitor list or
+tell a device outage from a website outage. It also checks the public GitHub
+Releases API for newer stable versions. It never sends your monitor list or
 history to a SiteSignal service.
 
 Read [PRIVACY.md](PRIVACY.md) for the complete data-flow and retention details.

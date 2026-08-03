@@ -165,7 +165,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
       key: _boundaryKey,
       child: SiteSignalApp(
         controller: widget.controller,
-        applicationVersion: '1.0.0',
+        applicationVersion: '1.0.1',
         initialSection: widget.section,
       ),
     );

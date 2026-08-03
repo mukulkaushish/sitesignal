@@ -18,7 +18,7 @@ publish_to: "none"
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.12.0
@@ -67,7 +67,7 @@ msix_config:
   display_name: SiteSignal
   publisher_display_name: SiteSignal
   identity_name: dev.sitesignal.app
-  msix_version: 1.0.0.1
+  msix_version: 1.0.1.2
   architecture: x64
   capabilities: internetClient
   logo_path: assets/app_icon.png

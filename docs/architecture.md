@@ -14,6 +14,8 @@ database, network, notification plugin, or desktop window.
   notifications and tray integration, and mobile background work.
 - `lib/features/monitoring/presentation/` contains the controller, pages, and
   widgets.
+- `lib/features/updates/` contains the GitHub release adapter, update state, and
+  recommendation UI.
 - `lib/main.dart` creates the concrete adapters and starts the application.
 
 The domain layer defines ports such as `HealthChecker`, `MonitorRepository`,
@@ -41,6 +43,16 @@ Android background monitoring:
 controller -> background configuration snapshot -> foreground-service task
   -> connectivity and website probes -> runtime snapshot -> controller merge
 ```
+
+Update discovery:
+
+```text
+startup, daily resume, or user action -> latest stable GitHub release
+  -> semantic version comparison -> recommendation banner -> release page
+```
+
+Update discovery never downloads or installs a package. It only opens the
+official release page after a user action.
 
 Configuration and runtime results use separate snapshot keys. This keeps a
 background result from overwriting a newer pause, site, or settings change.

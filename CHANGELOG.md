@@ -5,6 +5,20 @@ Notable user-visible changes are recorded here. SiteSignal follows
 
 ## Unreleased
 
+## 1.0.1 - 2026-08-03
+
+### Added
+
+- Automatic discovery for ASP.NET live and ready checks, Quarkus aggregate
+  health, and Prometheus health and readiness endpoints.
+- A non-blocking daily check for the latest stable GitHub release, a manual
+  check in Settings, and a visible recommendation when an update is available.
+
+### Security
+
+- Health-check redirects are followed only when they remain on the configured
+  website's exact HTTP or HTTPS origin.
+
 ## 1.0.0 - 2026-08-03
 
 ### Added

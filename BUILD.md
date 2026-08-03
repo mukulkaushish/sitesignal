@@ -1,6 +1,6 @@
 # Build and release SiteSignal
 
-Run commands from the repository root. SiteSignal 1.0.0 uses Flutter 3.44.7
+Run commands from the repository root. SiteSignal 1.0.1 uses Flutter 3.44.7
 and Dart 3.12.
 
 ## Prepare the toolchain
@@ -27,15 +27,15 @@ flutter test --coverage
 The reusable quality workflow also checks GitHub Actions syntax, requires at
 least 73.5% line coverage, and rejects unpinned third-party actions.
 
-## Version 1.0.0
+## Version 1.0.1
 
 The application and Windows package versions are declared in `pubspec.yaml`:
 
 ```yaml
-version: 1.0.0+1
+version: 1.0.1+2
 
 msix_config:
-  msix_version: 1.0.0.1
+  msix_version: 1.0.1.2
 ```
 
 The part before `+` is the public release version. The build number becomes the
@@ -202,48 +202,48 @@ a release.
 
 The build and release matrix does not create an iOS package.
 
-## Publish 1.0.0
+## Publish 1.0.1
 
-The release tag must be exactly `v1.0.0`. The quality gate compares it with the
+The release tag must be exactly `v1.0.1`. The quality gate compares it with the
 public version in `pubspec.yaml` and stops before packaging if they differ.
 
 ```bash
-git tag -a v1.0.0 -m "SiteSignal 1.0.0"
-git push origin v1.0.0
+git tag -a v1.0.1 -m "SiteSignal 1.0.1"
+git push origin v1.0.1
 ```
 
 The tag starts the complete native matrix. The release appears only after every
 quality, device, build, package-count, and checksum check succeeds.
 
-## Prepare version 1.0.1
+## Prepare version 1.0.2
 
 1. Update `CHANGELOG.md`.
 2. Change these exact values in `pubspec.yaml`:
 
    ```yaml
-   version: 1.0.1+2
+   version: 1.0.2+3
 
    msix_config:
-     msix_version: 1.0.1.2
+     msix_version: 1.0.2.3
    ```
 
 3. Run the local quality checks, commit, and push `main`:
 
    ```bash
    git add pubspec.yaml CHANGELOG.md
-   git commit -m "chore: prepare 1.0.1 release"
+   git commit -m "chore: prepare 1.0.2 release"
    git push origin main
    ```
 
 4. Wait for CI to pass, then create and push an annotated tag:
 
    ```bash
-   git tag -a v1.0.1 -m "SiteSignal 1.0.1"
-   git push origin v1.0.1
+   git tag -a v1.0.2 -m "SiteSignal 1.0.2"
+   git push origin v1.0.2
    ```
 
-The tag/version guard rejects an accidental tag such as `v1.0.1` while
-`pubspec.yaml` still says `1.0.0`. Do not move a published tag; fix the version,
+The tag/version guard rejects an accidental tag such as `v1.0.2` while
+`pubspec.yaml` still says `1.0.1`. Do not move a published tag; fix the version,
 commit it, and create the correct new tag.
 
 ## Release smoke checks

@@ -15,7 +15,7 @@ void main() {
     final bridge = FakeDesktopBridge();
     final controller = await createDemoMonitorController(desktopBridge: bridge);
     await tester.pumpWidget(
-      SiteSignalApp(controller: controller, applicationVersion: '1.0.0'),
+      SiteSignalApp(controller: controller, applicationVersion: '1.0.1'),
     );
     await tester.pumpAndSettle();
 

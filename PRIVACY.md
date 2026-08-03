@@ -18,7 +18,7 @@ SiteSignal service because no such service exists.
 
 ## Network requests
 
-SiteSignal makes three kinds of outbound request:
+SiteSignal makes four kinds of outbound request:
 
 1. Health requests to websites you explicitly configure.
 2. Bounded discovery requests to conventional health paths and favicon files on
@@ -26,6 +26,8 @@ SiteSignal makes three kinds of outbound request:
 3. Small requests to Google's Android connectivity endpoint and Microsoft's
    NCSI endpoint to confirm internet access before treating a failure as a
    website outage.
+4. A small request to the public GitHub Releases API at startup and at most once
+   per day while the app remains open, plus any manual update check.
 
 Favicon discovery runs only in the foreground. It follows only same-origin HTTP
 or HTTPS links, limits candidate count, redirects, response bytes, image size,
@@ -33,9 +35,9 @@ animation frames, and total time, then normalizes the result to at most 64×64
 pixels. Favicon URLs and image bytes are held only in foreground memory. They
 are never persisted to SQLite or included in background-isolate messages.
 
-Connectivity requests do not contain configured URLs or monitor history. As
-with any internet request, the destination can observe normal connection data
-such as the device's public IP address and user agent.
+Connectivity and update requests do not contain configured URLs or monitor
+history. As with any internet request, the destination can observe normal
+connection data such as the device's public IP address and user agent.
 
 Use HTTPS for monitored websites. Unencrypted HTTP traffic can be observed or
 changed by networks between the device and the website. SiteSignal rejects URLs
@@ -45,7 +47,7 @@ that contain usernames or passwords.
 
 Depending on the platform and enabled features, SiteSignal may use:
 
-- network access for health, discovery, and connectivity checks;
+- network access for health, discovery, connectivity, and update checks;
 - notification permission for outage, recovery, connectivity, and test alerts;
 - an Android foreground service and persistent status notification for
   continuous background monitoring;
