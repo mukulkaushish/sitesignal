@@ -103,11 +103,14 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
       WidgetsBinding.instance.scheduleFrame();
       await WidgetsBinding.instance.endOfFrame;
 
-      final context = _boundaryKey.currentContext;
-      if (context == null) {
+      if (!mounted) {
+        throw StateError('Screenshot capture was disposed before rendering.');
+      }
+      final boundaryContext = _boundaryKey.currentContext;
+      if (boundaryContext == null || !boundaryContext.mounted) {
         throw StateError('Screenshot boundary is not mounted.');
       }
-      final renderObject = context.findRenderObject();
+      final renderObject = boundaryContext.findRenderObject();
       if (renderObject is! RenderRepaintBoundary || !renderObject.hasSize) {
         throw StateError('Screenshot boundary is not ready.');
       }
