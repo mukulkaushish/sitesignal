@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:site_signal/core/theme/app_accent_color.dart';
 import 'package:site_signal/core/theme/app_dimensions.dart';
 import 'package:site_signal/core/theme/app_semantic_colors.dart';
@@ -84,6 +85,28 @@ class _SiteSignalAppState extends State<SiteSignalApp>
       themeMode: _themePreference.themeMode,
       theme: _lightTheme,
       darkTheme: _darkTheme,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          key: const ValueKey('system-ui-overlay-style'),
+          value: SystemUiOverlayStyle(
+            statusBarColor: theme.scaffoldBackgroundColor,
+            statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+            statusBarIconBrightness: isDark
+                ? Brightness.light
+                : Brightness.dark,
+            systemStatusBarContrastEnforced: false,
+            systemNavigationBarColor: theme.colorScheme.surface,
+            systemNavigationBarDividerColor: theme.dividerColor,
+            systemNavigationBarIconBrightness: isDark
+                ? Brightness.light
+                : Brightness.dark,
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: DashboardShell(
         controller: widget.controller,
         applicationVersion: widget.applicationVersion,

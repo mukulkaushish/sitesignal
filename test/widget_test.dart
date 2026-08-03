@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:site_signal/app/site_signal_app.dart';
 import 'package:site_signal/core/theme/app_theme_preference.dart';
@@ -21,6 +22,33 @@ Widget _testApp(MonitorController controller) {
 }
 
 void main() {
+  testWidgets('keeps Android system icons visible in light mode', (
+    tester,
+  ) async {
+    final controller = MonitorController(
+      repository: MemoryMonitorRepository(
+        paused: true,
+        themePreference: AppThemePreference.light,
+      ),
+      healthChecker: ScriptedHealthChecker(),
+      faviconResolver: FakeFaviconResolver(),
+      desktopBridge: FakeDesktopBridge(),
+      schedulerInterval: const Duration(days: 1),
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(_testApp(controller));
+    await tester.pumpAndSettle();
+
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('system-ui-overlay-style')),
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.dark);
+    expect(region.value.systemNavigationBarIconBrightness, Brightness.dark);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('recommends an available stable update', (tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
