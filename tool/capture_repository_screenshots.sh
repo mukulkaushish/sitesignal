@@ -7,6 +7,7 @@ project_directory="$(cd "$script_directory/.." && pwd)"
 screenshot_directory="$project_directory/docs/screenshots"
 target="${1:-}"
 android_device_id="${ANDROID_DEVICE_ID:-emulator-5554}"
+readonly screenshot_pages="overview history settings"
 
 mkdir -p "$screenshot_directory"
 cd "$project_directory"
@@ -43,7 +44,7 @@ capture_macos() {
 
   flutter run \
     --device-id macos \
-    --target test/screenshot_main.dart \
+    --target tool/repository_screenshot_main.dart \
     --dart-define "SCREENSHOT_PAGE=$page" | tee "$capture_log"
 
   generated_output="$(sed -n 's/^SCREENSHOT_SAVED=//p' "$capture_log" | tail -n 1)"
@@ -67,7 +68,7 @@ capture_android() {
     run-as dev.sitesignal.app rm -f "cache/$filename" >/dev/null 2>&1 || true
   flutter run \
     --device-id "$android_device_id" \
-    --target test/screenshot_main.dart \
+    --target tool/repository_screenshot_main.dart \
     --dart-define "SCREENSHOT_PAGE=$page" >"$capture_log" 2>&1 &
   flutter_pid=$!
 
@@ -94,10 +95,10 @@ capture_android() {
     return 1
   fi
 
-  # The in-app marker confirms that Flutter has rendered the target page.
-  # Give SystemUI one more beat to finish applying demo-mode status bars before
-  # capturing the complete physical display.
-  sleep 1
+  # The in-app marker confirms that Flutter rendered the target page. Keep one
+  # short, bounded delay for the native status and navigation bars, then capture
+  # the complete physical display instead of only the Flutter surface.
+  sleep 0.25
   adb -s "$android_device_id" exec-out screencap -p >"$output"
   kill -INT "$flutter_pid" >/dev/null 2>&1 || true
   wait "$flutter_pid" >/dev/null 2>&1 || true
@@ -109,14 +110,14 @@ capture_android() {
 
 case "$target" in
   macos)
-    capture_macos overview
-    capture_macos history
-    capture_macos settings
+    for page in $screenshot_pages; do
+      capture_macos "$page"
+    done
     ;;
   android)
-    capture_android overview
-    capture_android history
-    capture_android settings
+    for page in $screenshot_pages; do
+      capture_android "$page"
+    done
     ;;
   *)
     echo "Usage: $0 <macos|android>" >&2

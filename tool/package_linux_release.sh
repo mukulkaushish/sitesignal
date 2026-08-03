@@ -40,10 +40,8 @@ site_signal_bundle="$site_signal_project_dir/build/linux/$site_signal_flutter_ar
 site_signal_output_dir="$site_signal_project_dir/build/distributions/linux/$site_signal_artifact_arch"
 site_signal_output_bundle="$site_signal_output_dir/SiteSignal"
 site_signal_output_archive="$site_signal_output_dir/SiteSignal-linux-$site_signal_artifact_arch.tar.gz"
-site_signal_symbols_dir="$site_signal_project_dir/build/debug-symbols/linux"
-
 cd "$site_signal_project_dir"
-flutter build linux --release --split-debug-info="$site_signal_symbols_dir"
+flutter build linux --release
 
 if [ ! -d "$site_signal_bundle" ]; then
   echo "Flutter did not create the expected bundle: $site_signal_bundle" >&2

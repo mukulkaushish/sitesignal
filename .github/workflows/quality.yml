@@ -1,0 +1,72 @@
+name: Reusable quality gate
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.44.7
+
+jobs:
+  quality:
+    name: Format, analyze, and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Lint GitHub Actions workflows
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # 1.7.12
+        with:
+          args: -color
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Verify release tag matches pubspec
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use vX.Y.Z." >&2
+            exit 1
+          fi
+          app_version="$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+)\+.*/\1/p' pubspec.yaml)"
+          if [[ -z "$app_version" || "$GITHUB_REF_NAME" != "v$app_version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match pubspec version $app_version." >&2
+            exit 1
+          fi
+      - name: Verify Dart formatting
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test integration_test tool
+      - name: Verify shell syntax
+        run: bash -n tool/*.sh
+      - name: Enforce repository code rules
+        run: dart run tool/check_code_rules.dart
+      - name: Run static analysis
+        run: flutter analyze
+      - name: Run complete test suite
+        run: flutter test --coverage
+      - name: Enforce 75% line coverage
+        shell: bash
+        run: |
+          awk -F: '
+            /^LF:/ { found += $2 }
+            /^LH:/ { hit += $2 }
+            END {
+              coverage = found == 0 ? 0 : (100 * hit / found)
+              printf "Line coverage: %.2f%% (%d/%d)\n", coverage, hit, found
+              if (coverage < 75) exit 1
+            }
+          ' coverage/lcov.info
+      - name: Upload coverage report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sitesignal-test-coverage
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

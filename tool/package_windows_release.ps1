@@ -17,10 +17,8 @@ $outputDir = Join-Path $projectDir "build\distributions\windows\$artifactArchite
 $outputBundle = Join-Path $outputDir "SiteSignal"
 $outputArchive = Join-Path $outputDir "SiteSignal-windows-$artifactArchitecture.zip"
 $msixArchive = Join-Path $outputDir "SiteSignal-windows-$artifactArchitecture.msix"
-$symbolsDir = Join-Path $projectDir "build\debug-symbols\windows\$artifactArchitecture"
-
 Set-Location $projectDir
-flutter build windows --release --split-debug-info=$symbolsDir
+flutter build windows --release
 if ($LASTEXITCODE -ne 0) {
     throw "Flutter failed to build the Windows release."
 }

@@ -21,10 +21,8 @@ case "$site_signal_requested_arch" in
 esac
 
 site_signal_source_app="$site_signal_project_dir/build/macos/Build/Products/Release/SiteSignal.app"
-site_signal_symbols_dir="$site_signal_project_dir/build/debug-symbols/macos"
-
 cd "$site_signal_project_dir"
-flutter build macos --release --split-debug-info="$site_signal_symbols_dir"
+flutter build macos --release
 
 if [ ! -d "$site_signal_source_app" ]; then
   echo "Flutter did not create the expected app: $site_signal_source_app" >&2

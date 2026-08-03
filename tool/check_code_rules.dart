@@ -1,9 +1,49 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 final _forceUnwrapPattern = RegExp(
   r'[A-Za-z0-9_\)\]]!(?!=)\s*(?:[.\[\),;?:+\-*/%<>&|^~]|$)',
 );
 final _kotlinForceUnwrapPattern = RegExp(r'!!');
+final _pinnedActionPattern = RegExp(r'^[^@\s]+@[0-9a-fA-F]{40}$');
+final _pinnedDockerPattern = RegExp(
+  r'^docker://[^@\s]+@sha256:[0-9a-fA-F]{64}$',
+);
+
+const _requiredScreenshots = <String, ({int minWidth, int minHeight})>{
+  'docs/screenshots/macos-overview-light.png': (
+    minWidth: 2000,
+    minHeight: 1000,
+  ),
+  'docs/screenshots/macos-history-light.png': (minWidth: 2000, minHeight: 1000),
+  'docs/screenshots/macos-settings-light.png': (
+    minWidth: 2000,
+    minHeight: 1000,
+  ),
+  'docs/screenshots/android-overview-light.png': (
+    minWidth: 1000,
+    minHeight: 2000,
+  ),
+  'docs/screenshots/android-history-light.png': (
+    minWidth: 1000,
+    minHeight: 2000,
+  ),
+  'docs/screenshots/android-settings-light.png': (
+    minWidth: 1000,
+    minHeight: 2000,
+  ),
+};
+
+const _pngSignature = <int>[137, 80, 78, 71, 13, 10, 26, 10];
+const _videoExtensions = <String>{
+  '.avi',
+  '.gif',
+  '.m4v',
+  '.mkv',
+  '.mov',
+  '.mp4',
+  '.webm',
+};
 
 extension _ProjectSourceFile on File {
   bool get isCheckedSource {
@@ -177,9 +217,13 @@ Future<void> main() async {
     }
   }
 
+  await _checkPinnedWorkflowUses(violations);
+  _checkRepositoryScreenshots(violations);
+  await _checkTrackedRepositoryMedia(violations);
+
   if (violations.isEmpty) {
     stdout.writeln(
-      'Code rules passed: null safety, metadata, and generated assets are consistent.',
+      'Code rules passed: source, metadata, workflows, and repository media are consistent.',
     );
     return;
   }
@@ -188,6 +232,133 @@ Future<void> main() async {
     stderr.writeln('  $violation');
   }
   exitCode = 1;
+}
+
+Future<void> _checkPinnedWorkflowUses(List<String> violations) async {
+  final workflowDirectory = Directory('.github/workflows');
+  if (!workflowDirectory.existsSync()) {
+    violations.add(
+      '.github/workflows: required workflow directory is missing.',
+    );
+    return;
+  }
+  final workflowFiles =
+      workflowDirectory
+          .listSync(followLinks: false)
+          .whereType<File>()
+          .where(
+            (file) => file.path.endsWith('.yml') || file.path.endsWith('.yaml'),
+          )
+          .toList(growable: false)
+        ..sort((first, second) => first.path.compareTo(second.path));
+  for (final file in workflowFiles) {
+    final lines = await file.readAsLines();
+    for (var index = 0; index < lines.length; index += 1) {
+      var content = lines[index].trimLeft();
+      if (content.startsWith('-')) {
+        content = content.substring(1).trimLeft();
+      }
+      if (!content.startsWith('uses:')) {
+        continue;
+      }
+      var reference = content.substring('uses:'.length).trim();
+      final commentIndex = reference.indexOf(RegExp(r'\s+#'));
+      if (commentIndex >= 0) {
+        reference = reference.substring(0, commentIndex).trimRight();
+      }
+      if (reference.length >= 2 &&
+          ((reference.startsWith("'") && reference.endsWith("'")) ||
+              (reference.startsWith('"') && reference.endsWith('"')))) {
+        reference = reference.substring(1, reference.length - 1);
+      }
+      if (reference.startsWith('./')) {
+        continue;
+      }
+      final correctlyPinned = reference.startsWith('docker://')
+          ? _pinnedDockerPattern.hasMatch(reference)
+          : _pinnedActionPattern.hasMatch(reference);
+      if (!correctlyPinned) {
+        violations.add(
+          '${file.path}:${index + 1}: external uses `$reference` must be pinned '
+          'to a full commit SHA (or Docker sha256 digest).',
+        );
+      }
+    }
+  }
+}
+
+void _checkRepositoryScreenshots(List<String> violations) {
+  for (final entry in _requiredScreenshots.entries) {
+    final file = File(entry.key);
+    if (!file.existsSync()) {
+      violations.add(
+        '${entry.key}: required light-mode screenshot is missing.',
+      );
+      continue;
+    }
+    final bytes = file.readAsBytesSync();
+    if (bytes.length < 24 || !_startsWith(bytes, _pngSignature)) {
+      violations.add(
+        '${entry.key}: screenshot must have a valid PNG signature.',
+      );
+      continue;
+    }
+    if (String.fromCharCodes(bytes.sublist(12, 16)) != 'IHDR') {
+      violations.add('${entry.key}: PNG must start with an IHDR chunk.');
+      continue;
+    }
+    final data = ByteData.sublistView(bytes);
+    final width = data.getUint32(16, Endian.big);
+    final height = data.getUint32(20, Endian.big);
+    final minimum = entry.value;
+    if (width < minimum.minWidth || height < minimum.minHeight) {
+      violations.add(
+        '${entry.key}: ${width}x$height is below the required '
+        '${minimum.minWidth}x${minimum.minHeight}.',
+      );
+    }
+  }
+}
+
+Future<void> _checkTrackedRepositoryMedia(List<String> violations) async {
+  final result = await Process.run('git', const <String>['ls-files', '-z']);
+  if (result.exitCode != 0) {
+    violations.add('git ls-files: could not inspect tracked repository media.');
+    return;
+  }
+  for (final rawPath in (result.stdout as String).split('\u0000')) {
+    final filePath = rawPath.replaceAll('\\', '/');
+    if (filePath.isEmpty) {
+      continue;
+    }
+    final lowerPath = filePath.toLowerCase();
+    final dotIndex = lowerPath.lastIndexOf('.');
+    final extension = dotIndex < 0 ? '' : lowerPath.substring(dotIndex);
+    if (_videoExtensions.contains(extension)) {
+      violations.add(
+        '$filePath: tracked video or animation media is not allowed.',
+      );
+    }
+    if (lowerPath.startsWith('docs/screenshots/') &&
+        lowerPath.contains('dark') &&
+        const <String>{'.png', '.jpg', '.jpeg', '.webp'}.contains(extension)) {
+      violations.add(
+        '$filePath: only light-mode repository screenshots are allowed.',
+      );
+    }
+  }
+}
+
+bool _startsWith(List<int> bytes, List<int> prefix) {
+  if (bytes.length < prefix.length) {
+    return false;
+  }
+  for (var index = 0; index < prefix.length; index += 1) {
+    if (bytes[index] != prefix[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool _sameBytes(List<int> first, List<int> second) {

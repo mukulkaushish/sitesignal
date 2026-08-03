@@ -259,7 +259,6 @@ class _ReleaseBuilder {
       'apk',
       '--release',
       '--split-per-abi',
-      '--split-debug-info=${path.join(projectDirectory, 'build', 'debug-symbols', 'android')}',
     ];
     if (architectures.length == 1) {
       flutterArguments.add(

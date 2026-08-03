@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - docs/screenshots/**
   pull_request:
   workflow_dispatch:
 
@@ -20,106 +18,61 @@ env:
 
 jobs:
   quality:
-    name: Format, analyze, and test
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - name: Lint GitHub Actions workflows
-        uses: docker://rhysd/actionlint:1.7.12
-        with:
-          args: -color
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Verify Dart formatting
-        run: >-
-          dart format --output=none --set-exit-if-changed
-          lib test integration_test tool
-      - name: Verify shell syntax
-        run: bash -n tool/*.sh
-      - name: Enforce repository code rules
-        run: dart run tool/check_code_rules.dart
-      - name: Run static analysis
-        run: flutter analyze
-      - name: Run the complete test suite
-        run: flutter test --coverage
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v7
-        with:
-          name: sitesignal-test-coverage
-          path: coverage/lcov.info
-          if-no-files-found: error
-          retention-days: 7
+    name: Quality gate
+    uses: ./.github/workflows/quality.yml
+    permissions:
+      contents: read
 
-  macos:
-    name: ARM macOS build and screenshots
+  macos-screenshots:
+    name: Verify macOS light screenshots
     needs: quality
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install dependencies
         run: flutter pub get
-      - name: Build ARM64 release
-        run: >-
-          dart run tool/build_all_platforms.dart
-          --target macos
-          --arch arm64
-          --skip-pub-get
-      - name: Capture light-mode page collection
+      - name: Capture overview, history, and settings
         run: ./tool/capture_repository_screenshots.sh macos
-      - name: Upload ARM64 distribution
-        uses: actions/upload-artifact@v7
-        with:
-          name: sitesignal-macos-arm64
-          path: build/distributions/macos/arm64/*.zip
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
-      - name: Upload macOS screenshots
-        uses: actions/upload-artifact@v7
+      - name: Validate screenshot files and dimensions
+        run: dart run tool/check_code_rules.dart
+      - name: Verify checked-in screenshots are current
+        run: git diff --exit-code -- docs/screenshots/macos-*-light.png
+      - name: Upload verified screenshots
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sitesignal-screenshots-macos
-          path: docs/screenshots/macos-*.png
+          path: docs/screenshots/macos-*-light.png
           if-no-files-found: error
-          retention-days: 7
-
-  android:
-    name: Android build and screenshots
+          retention-days: 1
+          compression-level: 0
+  android-integration:
+    name: Verify Android flow and light screenshots
     needs: quality
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
       - name: Install dependencies
         run: flutter pub get
-      - name: Build split release APKs
-        run: >-
-          dart run tool/build_all_platforms.dart
-          --target android
-          --arch all
-          --skip-pub-get
       - name: Enable KVM for the Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Capture screenshots and run the feature flow
-        uses: reactivecircus/android-emulator-runner@v2
+      - name: Run feature flow and capture three screenshots
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 30
           arch: x86_64
@@ -130,20 +83,15 @@ jobs:
             -no-window -gpu swiftshader_indirect -no-snapshot -noaudio
             -no-boot-anim -camera-back none
           script: |
-            ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_repository_screenshots.sh android
             flutter test integration_test/feature_flow_test.dart --device-id emulator-5554
-      - name: Upload Android distributions
-        uses: actions/upload-artifact@v7
-        with:
-          name: sitesignal-android-apks
-          path: build/distributions/android/*/*.apk
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
-      - name: Upload Android screenshots
-        uses: actions/upload-artifact@v7
+            ANDROID_DEVICE_ID=emulator-5554 ./tool/capture_repository_screenshots.sh android
+            dart run tool/check_code_rules.dart
+            git diff --exit-code -- docs/screenshots/android-*-light.png
+      - name: Upload verified screenshots
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sitesignal-screenshots-android
-          path: docs/screenshots/android-*.png
+          path: docs/screenshots/android-*-light.png
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
+          compression-level: 0

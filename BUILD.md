@@ -350,7 +350,7 @@ docs/screenshots/android-history-light.png
 docs/screenshots/android-settings-light.png
 ```
 
-The Flutter entry point is `test/screenshot_main.dart`. macOS writes a 2× PNG
+The Flutter entry point is `tool/repository_screenshot_main.dart`. macOS writes a 2× PNG
 from a root `RepaintBoundary` in the actual platform engine, so capture does not
 need Screen Recording permission and does not use Flutter's placeholder test
 font. Android uses `adb screencap` at the emulator's native 1080×2340 display

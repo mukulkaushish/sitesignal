@@ -8,10 +8,13 @@ import 'package:flutter/rendering.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:site_signal/app/site_signal_app.dart';
+import 'package:site_signal/core/theme/app_theme_preference.dart';
 import 'package:site_signal/features/monitoring/presentation/controllers/monitor_controller.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'support/demo_app.dart';
+import '../test/support/demo_app.dart';
+
+final _screenshotReferenceTime = DateTime.utc(2026, 8, 3, 12);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,22 +39,23 @@ Future<void> main() async {
       _ => const Size(1440, 900),
     };
     await windowManager.ensureInitialized();
-    unawaited(
-      windowManager.waitUntilReadyToShow(
-        WindowOptions(
-          size: size,
-          minimumSize: const Size(320, 480),
-          center: true,
-          title: 'SiteSignal',
-        ),
-        () async {
-          await windowManager.show();
-          await windowManager.focus();
-        },
+    await windowManager.waitUntilReadyToShow(
+      WindowOptions(
+        size: size,
+        minimumSize: const Size(320, 480),
+        center: true,
+        title: 'SiteSignal',
       ),
+      () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
     );
   }
-  final controller = await createDemoMonitorController();
+  final controller = await createDemoMonitorController(
+    themePreference: AppThemePreference.light,
+    referenceTime: _screenshotReferenceTime,
+  );
   runApp(
     _ScreenshotCapture(
       controller: controller,
@@ -89,8 +93,14 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
 
   Future<void> _capture() async {
     try {
-      // Let fonts, icons, desktop window sizing, and the first route settle.
-      await Future<void>.delayed(const Duration(seconds: 2));
+      // Wait for two explicitly scheduled frames, then allow one short bounded
+      // delay for native window chrome and platform fonts to finish settling.
+      for (var index = 0; index < 2; index += 1) {
+        WidgetsBinding.instance.scheduleFrame();
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      WidgetsBinding.instance.scheduleFrame();
       await WidgetsBinding.instance.endOfFrame;
 
       final context = _boundaryKey.currentContext;
@@ -98,7 +108,7 @@ class _ScreenshotCaptureState extends State<_ScreenshotCapture> {
         throw StateError('Screenshot boundary is not mounted.');
       }
       final renderObject = context.findRenderObject();
-      if (renderObject is! RenderRepaintBoundary) {
+      if (renderObject is! RenderRepaintBoundary || !renderObject.hasSize) {
         throw StateError('Screenshot boundary is not ready.');
       }
 

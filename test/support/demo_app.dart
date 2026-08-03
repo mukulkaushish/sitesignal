@@ -7,10 +7,11 @@ import 'fakes.dart';
 Future<MonitorController> createDemoMonitorController({
   AppThemePreference themePreference = AppThemePreference.light,
   FakeDesktopBridge? desktopBridge,
+  DateTime? referenceTime,
 }) async {
   final controller = MonitorController(
     repository: MemoryMonitorRepository(
-      sites: demoSites(),
+      sites: demoSites(referenceTime: referenceTime),
       themePreference: themePreference,
     ),
     healthChecker: ScriptedHealthChecker(),
@@ -23,14 +24,9 @@ Future<MonitorController> createDemoMonitorController({
   return controller;
 }
 
-List<SiteMonitor> demoSites() {
-  final now = DateTime.now().toUtc();
-  final localNow = DateTime.now();
-  final startOfToday = DateTime(
-    localNow.year,
-    localNow.month,
-    localNow.day,
-  ).toUtc();
+List<SiteMonitor> demoSites({DateTime? referenceTime}) {
+  final now = (referenceTime ?? DateTime.now()).toUtc();
+  final startOfToday = DateTime.utc(now.year, now.month, now.day);
   final elapsedToday = now.difference(startOfToday);
   final productionTransition = startOfToday.add(
     Duration(milliseconds: elapsedToday.inMilliseconds ~/ 3),
