@@ -38,9 +38,24 @@ jobs:
             arch: arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - if: matrix.arch == 'x86_64'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Check out pinned Flutter SDK for Linux ARM64
+        if: matrix.arch == 'arm64'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: flutter/flutter
+          ref: 84fc5cbb223bc12f83d65b647ff8a56caf779ffd # Flutter 3.44.7
+          path: .flutter-sdk
+          persist-credentials: false
+      - name: Bootstrap Flutter SDK for Linux ARM64
+        if: matrix.arch == 'arm64'
+        run: |
+          echo "$GITHUB_WORKSPACE/.flutter-sdk/bin" >> "$GITHUB_PATH"
+          "$GITHUB_WORKSPACE/.flutter-sdk/bin/flutter" config --no-analytics
+          "$GITHUB_WORKSPACE/.flutter-sdk/bin/flutter" --version
       - name: Install desktop dependencies
         run: |
           sudo apt-get update
@@ -103,9 +118,31 @@ jobs:
             arch: arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - id: flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+      - name: Bootstrap native Flutter SDK for Windows ARM64
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $flutterRoot = "${{ steps.flutter.outputs['CACHE-PATH'] }}"
+          if ([string]::IsNullOrWhiteSpace($flutterRoot)) {
+            throw 'Flutter SDK path was not provided by the setup action.'
+          }
+          $dartStamp = Join-Path $flutterRoot 'bin\cache\engine-dart-sdk.stamp'
+          Remove-Item -LiteralPath $dartStamp -Force -ErrorAction SilentlyContinue
+          & (Join-Path $flutterRoot 'bin\internal\update_dart_sdk.ps1')
+          $dartVersion = (
+            & (Join-Path $flutterRoot 'bin\dart.bat') --version 2>&1 |
+              Out-String
+          ).Trim()
+          Write-Host $dartVersion
+          if ($dartVersion -notmatch 'windows_arm64') {
+            throw "Expected the Windows ARM64 Dart SDK, got: $dartVersion"
+          }
+          & (Join-Path $flutterRoot 'bin\flutter.bat') precache --windows
       - run: flutter pub get
       - name: Build and package release
         run: >-
